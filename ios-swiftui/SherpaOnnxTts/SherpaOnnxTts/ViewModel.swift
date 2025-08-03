@@ -9,11 +9,11 @@ import Foundation
 
 // used to get the path to espeak-ng-data
 func resourceURL(to path: String) -> String {
-  return URL(string: path, relativeTo: Bundle.main.resourceURL)!.path
+  return URL(string: "kokoro-82m/\(path)", relativeTo: Bundle.main.resourceURL)!.path
 }
 
 func getResource(_ forResource: String, _ ofType: String) -> String {
-  let path = Bundle.main.path(forResource: forResource, ofType: ofType)
+  let path = Bundle.main.path(forResource: "kokoro-82m/\(forResource)", ofType: ofType)
   precondition(
     path != nil,
     "\(forResource).\(ofType) does not exist!\n" + "Remember to change \n"
