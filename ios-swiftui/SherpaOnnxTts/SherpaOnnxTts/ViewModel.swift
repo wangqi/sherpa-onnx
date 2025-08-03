@@ -205,7 +205,17 @@ func getTtsFor_kokoro_multi_lang_v1_0() -> SherpaOnnxOfflineTtsWrapper {
   let kokoro = sherpaOnnxOfflineTtsKokoroModelConfig(
     model: model, voices: voices, tokens: tokens, dataDir: dataDir,
     dictDir: dictDir, lexicon: lexicon)
-  let modelConfig = sherpaOnnxOfflineTtsModelConfig(kokoro: kokoro)
+  
+  // CRITICAL FIX: Explicitly set provider to "cpu" for iOS
+  let modelConfig = sherpaOnnxOfflineTtsModelConfig(
+    vits: sherpaOnnxOfflineTtsVitsModelConfig(),
+    matcha: sherpaOnnxOfflineTtsMatchaModelConfig(),
+    kokoro: kokoro,
+    numThreads: 1,
+    debug: 1,  // Enable debug to see provider info
+    provider: "cpu"  // Force CPU provider instead of CoreML
+  )
+  
   var config = sherpaOnnxOfflineTtsConfig(model: modelConfig)
 
   return SherpaOnnxOfflineTtsWrapper(config: &config)

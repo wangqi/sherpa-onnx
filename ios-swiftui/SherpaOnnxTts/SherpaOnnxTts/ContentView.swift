@@ -59,16 +59,61 @@ struct ContentView: View {
                         return
                     }
 
+                    // CRITICAL FIX: Setup AVAudioSession for iOS
+                    do {
+                        let audioSession = AVAudioSession.sharedInstance()
+                        try audioSession.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+                        try audioSession.setActive(true)
+                        print("Audio session configured successfully")
+                    } catch {
+                        print("Failed to setup audio session: \(error)")
+                        return
+                    }
+
                     let audio = tts.generate(text: t, sid: speakerId, speed: Float(self.speed))
                     if self.filename.absoluteString.isEmpty {
                         let tempDirectoryURL = NSURL.fileURL(withPath: NSTemporaryDirectory(), isDirectory: true)
                         self.filename = tempDirectoryURL.appendingPathComponent("test.wav")
                     }
 
-                    let _ = audio.save(filename: filename.path)
+                    let success = audio.save(filename: filename.path)
+                    guard success == 1 else {
+                        print("Failed to save audio file")
+                        return
+                    }
+                    
+                    // Debug logging
+                    print("Audio file saved to: \(filename.path)")
+                    if let attrs = try? FileManager.default.attributesOfItem(atPath: filename.path),
+                       let fileSize = attrs[.size] as? Int64 {
+                        print("Audio file size: \(fileSize) bytes")
+                    }
 
-                    self.audioPlayer = try! AVAudioPlayer(contentsOf: filename)
-                    self.audioPlayer.play()
+                    do {
+                        self.audioPlayer = try AVAudioPlayer(contentsOf: filename)
+                        
+                        // Additional iOS-specific configuration
+                        self.audioPlayer.volume = 1.0
+                        
+                        // Prepare and play
+                        let prepared = self.audioPlayer.prepareToPlay()
+                        guard prepared else {
+                            print("Failed to prepare audio player")
+                            return
+                        }
+                        
+                        let played = self.audioPlayer.play()
+                        guard played else {
+                            print("Failed to start audio playback")
+                            return
+                        }
+                        
+                        print("Audio playback started successfully")
+                        print("Audio duration: \(self.audioPlayer.duration) seconds")
+                        
+                    } catch {
+                        print("Failed to create audio player: \(error)")
+                    }
                 }) {
                     Text("Generate")
                 }.alert(isPresented: $showAlert) {
@@ -76,6 +121,16 @@ struct ContentView: View {
                 }
                 Spacer()
                 Button (action: {
+                    // Ensure audio session is active for Play button too
+                    do {
+                        let audioSession = AVAudioSession.sharedInstance()
+                        try audioSession.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+                        try audioSession.setActive(true)
+                    } catch {
+                        print("Failed to setup audio session for playback: \(error)")
+                        return
+                    }
+                    
                     self.audioPlayer.play()
                 }) {
                     Text("Play")
@@ -85,11 +140,5 @@ struct ContentView: View {
             Spacer()
         }
         .padding()
-    }
-}
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
     }
 }
