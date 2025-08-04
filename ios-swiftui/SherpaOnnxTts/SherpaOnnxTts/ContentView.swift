@@ -111,11 +111,14 @@ struct ContentView: View {
             print("Created fresh TTS instance to avoid session reuse issues")
             
             // Generate audio with fresh instance and keep reference alive
+            print("Attempting TTS generation with text: '\(t)', speakerId: \(speakerId), speed: \(self.speed)")
             let audio = freshTts.generate(text: t, sid: speakerId, speed: Float(self.speed))
+            print("TTS generation completed, checking results...")
             
             // CRITICAL: Store audio object to prevent deallocation
             DispatchQueue.main.async {
                 self.generatedAudio = audio
+                
                 print("Audio generated - samples: \(audio.samples.count), sample rate: \(audio.sampleRate)")
                 
                 // CRITICAL FIX: Validate audio quality before proceeding
