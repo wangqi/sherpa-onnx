@@ -9,11 +9,11 @@ import Foundation
 
 // used to get the path to espeak-ng-data
 func resourceURL(to path: String) -> String {
-  return URL(string: path, relativeTo: Bundle.main.resourceURL)!.path
+  return URL(string: "kokoro-82m/\(path)", relativeTo: Bundle.main.resourceURL)!.path
 }
 
 func getResource(_ forResource: String, _ ofType: String) -> String {
-  let path = Bundle.main.path(forResource: forResource, ofType: ofType)
+  let path = Bundle.main.path(forResource: "kokoro-82m/\(forResource)", ofType: ofType)
   precondition(
     path != nil,
     "\(forResource).\(ofType) does not exist!\n" + "Remember to change \n"
@@ -205,7 +205,17 @@ func getTtsFor_kokoro_multi_lang_v1_0() -> SherpaOnnxOfflineTtsWrapper {
   let kokoro = sherpaOnnxOfflineTtsKokoroModelConfig(
     model: model, voices: voices, tokens: tokens, dataDir: dataDir,
     dictDir: dictDir, lexicon: lexicon)
-  let modelConfig = sherpaOnnxOfflineTtsModelConfig(kokoro: kokoro)
+  
+  // CRITICAL FIX: Explicitly set provider to "cpu" for iOS
+  let modelConfig = sherpaOnnxOfflineTtsModelConfig(
+    vits: sherpaOnnxOfflineTtsVitsModelConfig(),
+    matcha: sherpaOnnxOfflineTtsMatchaModelConfig(),
+    kokoro: kokoro,
+    numThreads: 1,
+    debug: 1,  // Enable debug to see provider info
+    provider: "cpu"  // Force CPU provider instead of CoreML
+  )
+  
   var config = sherpaOnnxOfflineTtsConfig(model: modelConfig)
 
   return SherpaOnnxOfflineTtsWrapper(config: &config)

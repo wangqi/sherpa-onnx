@@ -3,10 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		30AF09452E40181400E4DD30 /* kokoro-82m in Resources */ = {isa = PBXBuildFile; fileRef = 30AF09442E40181400E4DD30 /* kokoro-82m */; };
 		C917B4E52B0EEF3B005245AC /* SherpaOnnxTtsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C917B4E42B0EEF3B005245AC /* SherpaOnnxTtsApp.swift */; };
 		C917B4E72B0EEF3B005245AC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C917B4E62B0EEF3B005245AC /* ContentView.swift */; };
 		C917B4E92B0EEF3C005245AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C917B4E82B0EEF3C005245AC /* Assets.xcassets */; };
@@ -18,6 +19,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		30AF09442E40181400E4DD30 /* kokoro-82m */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "kokoro-82m"; path = "SherpaOnnxTts/kokoro-82m"; sourceTree = "<group>"; };
 		C917B4E12B0EEF3B005245AC /* SherpaOnnxTts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SherpaOnnxTts.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C917B4E42B0EEF3B005245AC /* SherpaOnnxTtsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SherpaOnnxTtsApp.swift; sourceTree = "<group>"; };
 		C917B4E62B0EEF3B005245AC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -28,6 +30,40 @@
 		C9FE9FE92B0F3754009F1003 /* sherpa-onnx.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = "sherpa-onnx.xcframework"; path = "../../build-ios/sherpa-onnx.xcframework"; sourceTree = "<group>"; };
 		C9FE9FEB2B0F3785009F1003 /* onnxruntime.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = onnxruntime.xcframework; path = "../../build-ios/ios-onnxruntime/1.17.1/onnxruntime.xcframework"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		30AF09432E4017FA00E4DD30 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"date-zh.fst",
+				dict/generate_user_dict.py,
+				dict/hmm_model.utf8,
+				dict/idf.utf8,
+				dict/jieba.dict.utf8,
+				dict/pos_dict/char_state_tab.utf8,
+				dict/pos_dict/prob_emit.utf8,
+				dict/pos_dict/prob_start.utf8,
+				dict/pos_dict/prob_trans.utf8,
+				dict/README.md,
+				dict/stop_words.utf8,
+				dict/user.dict.utf8,
+				"lexicon-gb-en.txt",
+				"lexicon-us-en.txt",
+				"lexicon-zh.txt",
+				LICENSE,
+				"number-zh.fst",
+				"phone-zh.fst",
+				README.md,
+				tokens.txt,
+				voices.bin,
+			);
+			target = C917B4E02B0EEF3B005245AC /* SherpaOnnxTts */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		30AF07C92E4017EF00E4DD30 /* kokoro-82m */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (30AF09432E4017FA00E4DD30 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "kokoro-82m"; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		C917B4DE2B0EEF3B005245AC /* Frameworks */ = {
@@ -45,6 +81,7 @@
 		C917B4D82B0EEF3B005245AC = {
 			isa = PBXGroup;
 			children = (
+				30AF09442E40181400E4DD30 /* kokoro-82m */,
 				C917B4E32B0EEF3B005245AC /* SherpaOnnxTts */,
 				C917B4E22B0EEF3B005245AC /* Products */,
 				C9FE9FE82B0F3754009F1003 /* Frameworks */,
@@ -62,6 +99,7 @@
 		C917B4E32B0EEF3B005245AC /* SherpaOnnxTts */ = {
 			isa = PBXGroup;
 			children = (
+				30AF07C92E4017EF00E4DD30 /* kokoro-82m */,
 				C9FE9FE62B0F3620009F1003 /* SherpaOnnx.swift */,
 				C9FE9FE42B0F33CD009F1003 /* ViewModel.swift */,
 				C917B4E42B0EEF3B005245AC /* SherpaOnnxTtsApp.swift */,
@@ -103,6 +141,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				30AF07C92E4017EF00E4DD30 /* kokoro-82m */,
 			);
 			name = SherpaOnnxTts;
 			productName = SherpaOnnxTts;
@@ -147,6 +188,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				30AF09452E40181400E4DD30 /* kokoro-82m in Resources */,
 				C917B4EC2B0EEF3C005245AC /* Preview Assets.xcassets in Resources */,
 				C917B4E92B0EEF3C005245AC /* Assets.xcassets in Resources */,
 			);
@@ -291,6 +333,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SherpaOnnxTts/Preview Content\"";
+				DEVELOPMENT_TEAM = Y4G353X6Q5;
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = "${PROJECT_DIR}/../../build-ios";
 				GENERATE_INFOPLIST_FILE = YES;
@@ -323,6 +366,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SherpaOnnxTts/Preview Content\"";
+				DEVELOPMENT_TEAM = Y4G353X6Q5;
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = "${PROJECT_DIR}/../../build-ios";
 				GENERATE_INFOPLIST_FILE = YES;
