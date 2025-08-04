@@ -21,7 +21,7 @@ struct ContentView: View {
     @State private var generatedAudio: SherpaOnnxGeneratedAudioWrapper?
     @State private var isGenerating = false
 
-    private var tts = createOfflineTts()
+    // CRITICAL FIX: Don't reuse TTS instance - create fresh one each time
 
     var body: some View {
 
@@ -106,16 +106,33 @@ struct ContentView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             print("Starting TTS generation for: '\(t)' with speaker \(speakerId)")
             
-            // Generate audio and keep reference alive
-            let audio = tts.generate(text: t, sid: speakerId, speed: Float(self.speed))
+            // CRITICAL FIX: Create fresh TTS instance for each synthesis to avoid session reuse corruption
+            let freshTts = createOfflineTts()
+            print("Created fresh TTS instance to avoid session reuse issues")
+            
+            // Generate audio with fresh instance and keep reference alive
+            let audio = freshTts.generate(text: t, sid: speakerId, speed: Float(self.speed))
             
             // CRITICAL: Store audio object to prevent deallocation
             DispatchQueue.main.async {
                 self.generatedAudio = audio
                 print("Audio generated - samples: \(audio.samples.count), sample rate: \(audio.sampleRate)")
                 
-                // Proceed with file save and playback
-                self.saveAndPlayAudio(audio: audio)
+                // CRITICAL FIX: Validate audio quality before proceeding
+                let nonZeroSamples = audio.samples.filter { abs($0) > 0.001 }.count
+                let sampleRatio = Double(nonZeroSamples) / Double(audio.samples.count)
+                
+                print("Audio validation - Non-zero samples: \(nonZeroSamples)/\(audio.samples.count) (\(String(format: "%.1f", sampleRatio * 100))%)")
+                
+                if sampleRatio > 0.1 { // At least 10% non-zero samples indicates valid audio
+                    print("Audio validation PASSED - proceeding with save and playback")
+                    // Proceed with file save and playback
+                    self.saveAndPlayAudio(audio: audio)
+                } else {
+                    print("Audio validation FAILED - generated mostly silent audio, this indicates model inference failure")
+                    self.isGenerating = false
+                    // Could implement retry logic here in the future
+                }
             }
         }
     }
