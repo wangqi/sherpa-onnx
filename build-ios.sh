@@ -8,6 +8,31 @@ cd $dir
 onnxruntime_version=1.17.1
 onnxruntime_dir=ios-onnxruntime/$onnxruntime_version
 
+IOS_DEVICE_SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+IOS_SIM_SDK_PATH=$(xcrun --sdk iphonesimulator --show-sdk-path)
+IOS_SIM_CLANG=$(xcrun --sdk iphonesimulator --find clang)
+IOS_SIM_CLANGXX=$(xcrun --sdk iphonesimulator --find clang++)
+IOS_DEVICE_CLANG=$(xcrun --sdk iphoneos --find clang)
+IOS_DEVICE_CLANGXX=$(xcrun --sdk iphoneos --find clang++)
+IOS_LIBTOOL=$(xcrun --find libtool)
+
+if [ ! -d "$IOS_DEVICE_SDK_PATH" ] || [ ! -d "$IOS_SIM_SDK_PATH" ] || \
+   [ ! -x "$IOS_SIM_CLANG" ] || [ ! -x "$IOS_SIM_CLANGXX" ] || \
+   [ ! -x "$IOS_DEVICE_CLANG" ] || [ ! -x "$IOS_DEVICE_CLANGXX" ] || \
+   [ ! -x "$IOS_LIBTOOL" ]; then
+  echo "Unable to locate required iOS SDK or compiler paths."
+  echo "Device SDK: $IOS_DEVICE_SDK_PATH"
+  echo "Simulator SDK: $IOS_SIM_SDK_PATH"
+  echo "Simulator clang: $IOS_SIM_CLANG"
+  echo "Simulator clang++: $IOS_SIM_CLANGXX"
+  echo "Device clang: $IOS_DEVICE_CLANG"
+  echo "Device clang++: $IOS_DEVICE_CLANGXX"
+  echo "libtool: $IOS_LIBTOOL"
+  exit 1
+fi
+
+export LIBTOOL=$IOS_LIBTOOL
+
 SHERPA_ONNX_GITHUB=github.com
 
 if [ "$SHERPA_ONNX_GITHUB_MIRROW" == true ]; then
@@ -46,6 +71,9 @@ cmake \
   -DBUILD_ESPEAK_NG_TESTS=OFF \
   -S .. \
   -DCMAKE_TOOLCHAIN_FILE=./toolchains/ios.toolchain.cmake \
+  -DCMAKE_OSX_SYSROOT=$IOS_SIM_SDK_PATH \
+  -DCMAKE_C_COMPILER=$IOS_SIM_CLANG \
+  -DCMAKE_CXX_COMPILER=$IOS_SIM_CLANGXX \
   -DPLATFORM=SIMULATOR64 \
   -DENABLE_BITCODE=0 \
   -DENABLE_ARC=1 \
@@ -73,6 +101,9 @@ cmake \
   -DBUILD_ESPEAK_NG_TESTS=OFF \
   -S .. \
   -DCMAKE_TOOLCHAIN_FILE=./toolchains/ios.toolchain.cmake \
+  -DCMAKE_OSX_SYSROOT=$IOS_SIM_SDK_PATH \
+  -DCMAKE_C_COMPILER=$IOS_SIM_CLANG \
+  -DCMAKE_CXX_COMPILER=$IOS_SIM_CLANGXX \
   -DPLATFORM=SIMULATORARM64 \
   -DENABLE_BITCODE=0 \
   -DENABLE_ARC=1 \
@@ -103,6 +134,9 @@ cmake \
   -DBUILD_ESPEAK_NG_TESTS=OFF \
   -S .. \
   -DCMAKE_TOOLCHAIN_FILE=./toolchains/ios.toolchain.cmake \
+  -DCMAKE_OSX_SYSROOT=$IOS_DEVICE_SDK_PATH \
+  -DCMAKE_C_COMPILER=$IOS_DEVICE_CLANG \
+  -DCMAKE_CXX_COMPILER=$IOS_DEVICE_CLANGXX \
   -DPLATFORM=OS64 \
   -DENABLE_BITCODE=0 \
   -DENABLE_ARC=1 \
