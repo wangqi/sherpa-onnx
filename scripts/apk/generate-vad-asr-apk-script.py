@@ -95,7 +95,7 @@ def get_models():
             """,
         ),
         Model(
-            model_name="sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
+            model_name="sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
             idx=15,
             lang="zh_en_ko_ja_yue",
             lang2="中英粤日韩",
@@ -105,7 +105,6 @@ def get_models():
             pushd $model_name
 
             rm -rfv test_wavs
-            rm -fv model.onnx
             rm -fv *.py
 
             ls -lh
@@ -736,6 +735,22 @@ def get_models():
             lang="zh",
             lang2="四川话",
             short_name="paraformer_四川话",
+            cmd="""
+            pushd $model_name
+
+            rm -rfv test_wavs
+
+            ls -lh
+
+            popd
+            """,
+        ),
+        Model(
+            model_name="sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12",
+            idx=44,
+            lang="1600",
+            lang2="1600_languages",
+            short_name="omnilingual_asr_300M_ctc_int8",
             cmd="""
             pushd $model_name
 

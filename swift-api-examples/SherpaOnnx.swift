@@ -368,6 +368,14 @@ func sherpaOnnxOfflineWenetCtcModelConfig(
   )
 }
 
+func sherpaOnnxOfflineOmnilingualAsrCtcModelConfig(
+  model: String = ""
+) -> SherpaOnnxOfflineOmnilingualAsrCtcModelConfig {
+  return SherpaOnnxOfflineOmnilingualAsrCtcModelConfig(
+    model: toCPointer(model)
+  )
+}
+
 func sherpaOnnxOfflineNemoEncDecCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineNemoEncDecCtcModelConfig {
@@ -492,7 +500,9 @@ func sherpaOnnxOfflineModelConfig(
     sherpaOnnxOfflineZipformerCtcModelConfig(),
   canary: SherpaOnnxOfflineCanaryModelConfig = sherpaOnnxOfflineCanaryModelConfig(),
   wenetCtc: SherpaOnnxOfflineWenetCtcModelConfig =
-    sherpaOnnxOfflineWenetCtcModelConfig()
+    sherpaOnnxOfflineWenetCtcModelConfig(),
+  omnilingual: SherpaOnnxOfflineOmnilingualAsrCtcModelConfig =
+    sherpaOnnxOfflineOmnilingualAsrCtcModelConfig()
 ) -> SherpaOnnxOfflineModelConfig {
   return SherpaOnnxOfflineModelConfig(
     transducer: transducer,
@@ -514,7 +524,8 @@ func sherpaOnnxOfflineModelConfig(
     dolphin: dolphin,
     zipformer_ctc: zipformerCtc,
     canary: canary,
-    wenet_ctc: wenetCtc
+    wenet_ctc: wenetCtc,
+    omnilingual: omnilingual
   )
 }
 
@@ -918,11 +929,11 @@ func sherpaOnnxOfflineTtsKittenModelConfig(
 
 func sherpaOnnxOfflineTtsZipvoiceModelConfig(
   tokens: String = "",
-  textModel: String = "",
-  flowMatchingModel: String = "",
+  encoder: String = "",
+  decoder: String = "",
   vocoder: String = "",
   dataDir: String = "",
-  pinyinDict: String = "",
+  lexicon: String = "",
   featScale: Float = 0.1,
   tShift: Float = 0.5,
   targetRms: Float = 0.1,
@@ -930,11 +941,11 @@ func sherpaOnnxOfflineTtsZipvoiceModelConfig(
 ) -> SherpaOnnxOfflineTtsZipvoiceModelConfig {
   return SherpaOnnxOfflineTtsZipvoiceModelConfig(
     tokens: toCPointer(tokens),
-    text_model: toCPointer(textModel),
-    flow_matching_model: toCPointer(flowMatchingModel),
+    encoder: toCPointer(encoder),
+    decoder: toCPointer(decoder),
     vocoder: toCPointer(vocoder),
     data_dir: toCPointer(dataDir),
-    pinyin_dict: toCPointer(pinyinDict),
+    lexicon: toCPointer(lexicon),
     feat_scale: featScale,
     t_shift: tShift,
     target_rms: targetRms,
