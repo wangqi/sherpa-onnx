@@ -3,13 +3,25 @@
 set -ex
 
 dir=build-swift-macos
+
+# Clean existing build directory to avoid stale CMake cache issues
+if [ -d "$dir" ]; then
+  echo "Cleaning existing build directory..."
+  rm -rf "$dir"
+fi
+
 mkdir -p $dir
 cd $dir
+
+# Get the correct macOS SDK path from Xcode
+MACOS_SDK_PATH=$(xcrun --sdk macosx --show-sdk-path)
+echo "Using macOS SDK: $MACOS_SDK_PATH"
 
 cmake \
   -DSHERPA_ONNX_ENABLE_BINARY=OFF \
   -DSHERPA_ONNX_BUILD_C_API_EXAMPLES=OFF \
   -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+  -DCMAKE_OSX_SYSROOT="$MACOS_SDK_PATH" \
   -DCMAKE_INSTALL_PREFIX=./install \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
