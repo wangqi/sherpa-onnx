@@ -6,7 +6,9 @@
 //
 
 import AVFoundation
+#if canImport(UIKit)
 import UIKit
+#endif
 
 extension AudioBuffer {
     func array() -> [Float] {

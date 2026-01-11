@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 #
-# Script to build iOS and macOS libraries and merge them into a unified xcframework
-# that supports all Apple platforms (iOS devices, iOS simulators, and macOS)
+# Script to build iOS, macOS, and Mac Catalyst libraries and merge them into a unified xcframework
+# that supports all Apple platforms (iOS devices, iOS simulators, macOS, and Mac Catalyst)
 #
 # Usage: ./build-xcframework.sh [options]
 #
 # Options:
-#   --skip-ios      Skip iOS build (use existing build-ios/sherpa-onnx.xcframework)
-#   --skip-macos    Skip macOS build (use existing build-swift-macos/sherpa-onnx.xcframework)
-#   --skip-build    Skip both builds (only merge existing xcframeworks)
-#   --clean         Clean all build directories before building
-#   -h, --help      Show this help message
+#   --skip-ios          Skip iOS build (use existing build)
+#   --skip-macos        Skip macOS build (use existing build)
+#   --skip-maccatalyst  Skip Mac Catalyst build (use existing build)
+#   --skip-build        Skip all builds (only merge existing xcframeworks)
+#   --clean             Clean all build directories before building
+#   -h, --help          Show this help message
 #
 # Output:
-#   - build-apple/sherpa-onnx.xcframework
+#   - build-ios/sherpa-onnx.xcframework (unified xcframework with all platforms)
 
 set -e
 
@@ -27,6 +28,7 @@ NC='\033[0m' # No Color
 # Default options
 SKIP_IOS=false
 SKIP_MACOS=false
+SKIP_MACCATALYST=false
 CLEAN_BUILD=false
 
 log() {
@@ -57,14 +59,15 @@ show_help() {
   echo "Build sherpa-onnx xcframework for all Apple platforms."
   echo ""
   echo "Options:"
-  echo "  --skip-ios      Skip iOS build (use existing build)"
-  echo "  --skip-macos    Skip macOS build (use existing build)"
-  echo "  --skip-build    Skip both builds (only merge existing xcframeworks)"
-  echo "  --clean         Clean all build directories before building"
-  echo "  -h, --help      Show this help message"
+  echo "  --skip-ios          Skip iOS build (use existing build)"
+  echo "  --skip-macos        Skip macOS build (use existing build)"
+  echo "  --skip-maccatalyst  Skip Mac Catalyst build (use existing build)"
+  echo "  --skip-build        Skip all builds (only merge existing xcframeworks)"
+  echo "  --clean             Clean all build directories before building"
+  echo "  -h, --help          Show this help message"
   echo ""
   echo "Output:"
-  echo "  build-apple/sherpa-onnx.xcframework"
+  echo "  build-ios/sherpa-onnx.xcframework"
   echo ""
   echo "Examples:"
   echo "  ./build-xcframework.sh              # Full build"
@@ -85,9 +88,14 @@ parse_args() {
         SKIP_MACOS=true
         shift
         ;;
+      --skip-maccatalyst)
+        SKIP_MACCATALYST=true
+        shift
+        ;;
       --skip-build)
         SKIP_IOS=true
         SKIP_MACOS=true
+        SKIP_MACCATALYST=true
         shift
         ;;
       --clean)
@@ -119,6 +127,11 @@ clean_builds() {
     rm -rf build-swift-macos
   fi
 
+  if [ -d "build-maccatalyst" ]; then
+    log "Removing build-maccatalyst..."
+    rm -rf build-maccatalyst
+  fi
+
   if [ -d "build-apple" ]; then
     log "Removing build-apple..."
     rm -rf build-apple
@@ -131,8 +144,9 @@ clean_builds() {
 build_ios() {
   if [ "$SKIP_IOS" = true ]; then
     log_step "Skipping iOS build (--skip-ios specified)"
-    if [ ! -d "build-ios/sherpa-onnx.xcframework" ]; then
-      error "iOS xcframework not found at build-ios/sherpa-onnx.xcframework. Cannot skip iOS build."
+    # Check for iOS slices (either in original location or backup)
+    if [ ! -d "build-ios/.backup/ios-arm64" ] && [ ! -d "build-ios/sherpa-onnx.xcframework/ios-arm64" ]; then
+      error "iOS xcframework not found. Neither build-ios/sherpa-onnx.xcframework nor build-ios/.backup exists. Cannot skip iOS build."
     fi
     return 0
   fi
@@ -197,16 +211,56 @@ build_macos() {
   fi
 }
 
+# Build Mac Catalyst xcframework
+build_maccatalyst() {
+  if [ "$SKIP_MACCATALYST" = true ]; then
+    log_step "Skipping Mac Catalyst build (--skip-maccatalyst specified)"
+    if [ ! -d "build-maccatalyst/sherpa-onnx.xcframework" ]; then
+      error "Mac Catalyst xcframework not found at build-maccatalyst/sherpa-onnx.xcframework. Cannot skip Mac Catalyst build."
+    fi
+    return 0
+  fi
+
+  log_step "Building Mac Catalyst xcframework..."
+  echo ""
+
+  # Check if build script exists
+  if [ ! -f "./build-maccatalyst.sh" ]; then
+    error "build-maccatalyst.sh not found in current directory"
+  fi
+
+  # Run the Mac Catalyst build
+  local start_time=$(date +%s)
+
+  if ./build-maccatalyst.sh; then
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    success "Mac Catalyst build completed in ${duration}s"
+  else
+    error "Mac Catalyst build failed. Check the output above for details."
+  fi
+
+  # Verify the output
+  if [ ! -d "build-maccatalyst/sherpa-onnx.xcframework" ]; then
+    error "Mac Catalyst xcframework not found after build. Build may have failed silently."
+  fi
+}
+
 # Check if required source xcframeworks exist
 check_prerequisites() {
   log_step "Checking prerequisites..."
 
-  if [ ! -d "build-ios/sherpa-onnx.xcframework" ]; then
-    error "iOS xcframework not found at build-ios/sherpa-onnx.xcframework"
+  # Check for iOS slices (either in original location or backup)
+  if [ ! -d "build-ios/.backup/ios-arm64" ] && [ ! -d "build-ios/sherpa-onnx.xcframework/ios-arm64" ]; then
+    error "iOS xcframework not found. Neither build-ios/sherpa-onnx.xcframework nor build-ios/.backup exists"
   fi
 
   if [ ! -d "build-swift-macos/sherpa-onnx.xcframework" ]; then
     error "macOS xcframework not found at build-swift-macos/sherpa-onnx.xcframework"
+  fi
+
+  if [ ! -d "build-maccatalyst/sherpa-onnx.xcframework" ]; then
+    error "Mac Catalyst xcframework not found at build-maccatalyst/sherpa-onnx.xcframework"
   fi
 
   success "Prerequisites check passed"
@@ -214,16 +268,28 @@ check_prerequisites() {
 
 # Clean and prepare output directory
 prepare_output_dir() {
-  log_step "Preparing output directory..."
+  log_step "Preparing output directory for unified xcframework..."
 
-  # Remove existing build-apple directory if it exists
-  if [ -d "build-apple" ]; then
-    log "Removing existing build-apple directory..."
-    rm -rf build-apple
+  # The unified xcframework will replace the iOS-only xcframework at build-ios/
+  # We need to preserve the iOS slices temporarily
+
+  if [ -d "build-ios/sherpa-onnx.xcframework" ]; then
+    log "Backing up iOS xcframework slices..."
+    mkdir -p build-ios/.backup
+
+    # Copy iOS slices to backup
+    if [ -d "build-ios/sherpa-onnx.xcframework/ios-arm64" ]; then
+      cp -r "build-ios/sherpa-onnx.xcframework/ios-arm64" build-ios/.backup/
+    fi
+    if [ -d "build-ios/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator" ]; then
+      cp -r "build-ios/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator" build-ios/.backup/
+    fi
+
+    # Remove the iOS-only xcframework
+    log "Removing iOS-only xcframework to make room for unified xcframework..."
+    rm -rf "build-ios/sherpa-onnx.xcframework"
   fi
 
-  # Create fresh build-apple directory
-  mkdir -p build-apple
   success "Output directory prepared"
 }
 
@@ -238,6 +304,8 @@ get_library_paths() {
     echo "$xcframework_path/ios-arm64_x86_64-simulator"
   elif [ "$platform" = "macos" ]; then
     echo "$xcframework_path/macos-arm64_x86_64"
+  elif [ "$platform" = "maccatalyst" ]; then
+    echo "$xcframework_path/maccatalyst-arm64_x86_64"
   fi
 }
 
@@ -246,9 +314,11 @@ create_unified_xcframework() {
   log_step "Creating unified xcframework..."
 
   # Get library paths from each xcframework
-  local ios_device_path=$(get_library_paths "build-ios/sherpa-onnx.xcframework" "ios")
-  local ios_sim_path=$(get_library_paths "build-ios/sherpa-onnx.xcframework" "ios-simulator")
+  # iOS slices are in the backup directory
+  local ios_device_path="build-ios/.backup/ios-arm64"
+  local ios_sim_path="build-ios/.backup/ios-arm64_x86_64-simulator"
   local macos_path=$(get_library_paths "build-swift-macos/sherpa-onnx.xcframework" "macos")
+  local maccatalyst_path=$(get_library_paths "build-maccatalyst/sherpa-onnx.xcframework" "maccatalyst")
 
   # Verify paths exist
   if [ ! -d "$ios_device_path" ]; then
@@ -260,41 +330,75 @@ create_unified_xcframework() {
   if [ ! -d "$macos_path" ]; then
     error "macOS library not found at $macos_path"
   fi
+  if [ ! -d "$maccatalyst_path" ]; then
+    error "Mac Catalyst library not found at $maccatalyst_path"
+  fi
 
   # Resolve static libraries and headers for each slice
   local ios_device_lib="$ios_device_path/libsherpa-onnx.a"
   local ios_sim_lib="$ios_sim_path/libsherpa-onnx.a"
   local macos_lib="$macos_path/libsherpa-onnx.a"
+  local maccatalyst_lib="$maccatalyst_path/libsherpa-onnx.a"
   local ios_device_headers="$ios_device_path/Headers"
   local ios_sim_headers="$ios_sim_path/Headers"
   local macos_headers="$macos_path/Headers"
+  local maccatalyst_headers="$maccatalyst_path/Headers"
 
-  for lib in "$ios_device_lib" "$ios_sim_lib" "$macos_lib"; do
+  for lib in "$ios_device_lib" "$ios_sim_lib" "$macos_lib" "$maccatalyst_lib"; do
     if [ ! -f "$lib" ]; then
       error "Expected static library not found: $lib"
     fi
   done
-  for hdr in "$ios_device_headers" "$ios_sim_headers" "$macos_headers"; do
+  for hdr in "$ios_device_headers" "$ios_sim_headers" "$macos_headers" "$maccatalyst_headers"; do
     if [ ! -d "$hdr" ]; then
       error "Expected Headers folder not found: $hdr"
     fi
   done
 
-  # Build the xcodebuild command with all libraries
+  # Build the xcodebuild command with iOS and macOS libraries only
+  # Note: Mac Catalyst must be added manually as xcodebuild doesn't support it
   local xcodebuild_cmd="xcodebuild -create-xcframework"
   xcodebuild_cmd="$xcodebuild_cmd -library $ios_device_lib -headers $ios_device_headers"
   xcodebuild_cmd="$xcodebuild_cmd -library $ios_sim_lib -headers $ios_sim_headers"
   xcodebuild_cmd="$xcodebuild_cmd -library $macos_lib -headers $macos_headers"
 
-  # Set output path
-  xcodebuild_cmd="$xcodebuild_cmd -output build-apple/sherpa-onnx.xcframework"
+  # Set output path - create unified xcframework at build-ios
+  xcodebuild_cmd="$xcodebuild_cmd -output build-ios/sherpa-onnx.xcframework"
 
   # Execute the command
   log "Executing: $xcodebuild_cmd"
-  if eval $xcodebuild_cmd; then
-    success "Successfully created unified xcframework"
-  else
-    error "Failed to create unified xcframework"
+  if ! eval $xcodebuild_cmd; then
+    error "Failed to create xcframework with iOS and macOS"
+  fi
+
+  log "Adding Mac Catalyst slice manually..."
+
+  # Copy Mac Catalyst slice to the xcframework
+  cp -r "$maccatalyst_path" build-ios/sherpa-onnx.xcframework/maccatalyst-arm64_x86_64
+
+  # Update Info.plist to include Mac Catalyst
+  # Read existing plist
+  local plist_path="build-ios/sherpa-onnx.xcframework/Info.plist"
+
+  # Add Mac Catalyst entry
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries: dict" "$plist_path" 2>/dev/null || true
+  local last_index=$(/usr/libexec/PlistBuddy -c "Print :AvailableLibraries" "$plist_path" | grep -c "Dict" || echo "0")
+  last_index=$((last_index - 1))
+
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:LibraryIdentifier string maccatalyst-arm64_x86_64" "$plist_path"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:LibraryPath string libsherpa-onnx.a" "$plist_path"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:HeadersPath string Headers" "$plist_path"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:SupportedArchitectures array" "$plist_path"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:SupportedArchitectures:0 string arm64" "$plist_path"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:SupportedArchitectures:1 string x86_64" "$plist_path"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:SupportedPlatform string maccatalyst" "$plist_path"
+
+  success "Successfully created unified xcframework at build-ios/sherpa-onnx.xcframework"
+
+  # Clean up backup directory
+  if [ -d "build-ios/.backup" ]; then
+    rm -rf build-ios/.backup
+    log "Cleaned up backup directory"
   fi
 }
 
@@ -302,7 +406,7 @@ create_unified_xcframework() {
 verify_xcframework() {
   log_step "Verifying unified xcframework..."
 
-  local xcframework_path="build-apple/sherpa-onnx.xcframework"
+  local xcframework_path="build-ios/sherpa-onnx.xcframework"
 
   if [ ! -d "$xcframework_path" ]; then
     error "Unified xcframework not found at $xcframework_path"
@@ -320,7 +424,7 @@ verify_xcframework() {
   /usr/libexec/PlistBuddy -c "Print :AvailableLibraries" "$xcframework_path/Info.plist" 2>/dev/null | grep -A 2 "SupportedPlatform" | grep -v "^--$" || true
 
   # Check each platform directory
-  local platforms=("ios-arm64" "ios-arm64_x86_64-simulator" "macos-arm64_x86_64")
+  local platforms=("ios-arm64" "ios-arm64_x86_64-simulator" "macos-arm64_x86_64" "maccatalyst-arm64_x86_64")
   for platform in "${platforms[@]}"; do
     if [ -d "$xcframework_path/$platform" ]; then
       echo -e "${GREEN}  [OK] $platform${NC}"
@@ -354,22 +458,23 @@ show_usage_info() {
   echo -e "${GREEN}  Build Complete!${NC}"
   echo -e "${GREEN}========================================${NC}"
   echo ""
-  echo "Output: build-apple/sherpa-onnx.xcframework"
+  echo "Output: build-ios/sherpa-onnx.xcframework"
   echo ""
   echo "Supported Platforms:"
   echo "  - iOS (arm64) - Physical devices"
   echo "  - iOS Simulator (arm64, x86_64)"
   echo "  - macOS (arm64, x86_64)"
+  echo "  - Mac Catalyst (arm64, x86_64)"
   echo ""
   echo "Usage in Xcode:"
-  echo "  1. Drag build-apple/sherpa-onnx.xcframework into your project"
+  echo "  1. Drag build-ios/sherpa-onnx.xcframework into your project"
   echo "  2. Select 'Copy items if needed'"
   echo "  3. Add to 'Frameworks, Libraries, and Embedded Content'"
   echo ""
   echo "Swift Package Manager:"
   echo "  .binaryTarget("
   echo "      name: \"sherpa-onnx\","
-  echo "      path: \"build-apple/sherpa-onnx.xcframework\""
+  echo "      path: \"build-ios/sherpa-onnx.xcframework\""
   echo "  )"
   echo ""
 }
@@ -388,9 +493,10 @@ main() {
 
   # Show build configuration
   log "Build configuration:"
-  echo "  - iOS build:   $([ "$SKIP_IOS" = true ] && echo "SKIP" || echo "BUILD")"
-  echo "  - macOS build: $([ "$SKIP_MACOS" = true ] && echo "SKIP" || echo "BUILD")"
-  echo "  - Clean build: $([ "$CLEAN_BUILD" = true ] && echo "YES" || echo "NO")"
+  echo "  - iOS build:         $([ "$SKIP_IOS" = true ] && echo "SKIP" || echo "BUILD")"
+  echo "  - macOS build:       $([ "$SKIP_MACOS" = true ] && echo "SKIP" || echo "BUILD")"
+  echo "  - Mac Catalyst build: $([ "$SKIP_MACCATALYST" = true ] && echo "SKIP" || echo "BUILD")"
+  echo "  - Clean build:       $([ "$CLEAN_BUILD" = true ] && echo "YES" || echo "NO")"
   echo ""
 
   # Step 0: Clean if requested
@@ -407,19 +513,23 @@ main() {
   build_macos
   echo ""
 
-  # Step 3: Check prerequisites (verify both builds exist)
+  # Step 3: Build Mac Catalyst
+  build_maccatalyst
+  echo ""
+
+  # Step 4: Check prerequisites (verify all builds exist)
   check_prerequisites
   echo ""
 
-  # Step 4: Prepare output directory
+  # Step 5: Prepare output directory
   prepare_output_dir
   echo ""
 
-  # Step 5: Create unified xcframework
+  # Step 6: Create unified xcframework
   create_unified_xcframework
   echo ""
 
-  # Step 6: Verify the result
+  # Step 7: Verify the result
   verify_xcframework
 
   # Calculate total time
@@ -431,7 +541,7 @@ main() {
   echo ""
   log "Total build time: ${minutes}m ${seconds}s"
 
-  # Step 7: Show usage information
+  # Step 8: Show usage information
   show_usage_info
 }
 

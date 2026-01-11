@@ -1,5 +1,7 @@
 import Flutter
+#if canImport(UIKit)
 import UIKit
+#endif
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
