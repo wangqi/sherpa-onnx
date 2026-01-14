@@ -761,6 +761,38 @@ def get_models():
             popd
             """,
         ),
+        Model(
+            model_name="sherpa-onnx-medasr-ctc-en-int8-2025-12-25",
+            idx=45,
+            lang="en",
+            lang2="英语",
+            short_name="google_medasr_ctc_int8",
+            cmd="""
+            pushd $model_name
+
+            rm -rfv test_wavs
+
+            ls -lh
+
+            popd
+            """,
+        ),
+        Model(
+            model_name="sherpa-onnx-funasr-nano-int8-2025-12-30",
+            idx=46,
+            lang="multi",
+            lang2="31_languages",
+            short_name="funasr_nano_int8_2025_12_30",
+            cmd="""
+            pushd $model_name
+
+            rm -rfv test_wavs
+
+            ls -lh
+
+            popd
+            """,
+        ),
     ]
     return models
 

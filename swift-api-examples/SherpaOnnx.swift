@@ -376,6 +376,14 @@ func sherpaOnnxOfflineOmnilingualAsrCtcModelConfig(
   )
 }
 
+func sherpaOnnxOfflineMedAsrCtcModelConfig(
+  model: String = ""
+) -> SherpaOnnxOfflineMedAsrCtcModelConfig {
+  return SherpaOnnxOfflineMedAsrCtcModelConfig(
+    model: toCPointer(model)
+  )
+}
+
 func sherpaOnnxOfflineNemoEncDecCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineNemoEncDecCtcModelConfig {
@@ -478,6 +486,32 @@ func sherpaOnnxOfflineLMConfig(
   )
 }
 
+func sherpaOnnxOfflineFunASRNanoModelConfig(
+  encoderAdaptor: String = "",
+  llm: String = "",
+  embedding: String = "",
+  tokenizer: String = "",
+  systemPrompt: String = "You are a helpful assistant.",
+  userPrompt: String = "语音转写：",
+  maxNewTokens: Int = 512,
+  temperature: Float = 1e-6,
+  topP: Float = 0.8,
+  seed: Int = 42
+) -> SherpaOnnxOfflineFunASRNanoModelConfig {
+  return SherpaOnnxOfflineFunASRNanoModelConfig(
+    encoder_adaptor: toCPointer(encoderAdaptor),
+    llm: toCPointer(llm),
+    embedding: toCPointer(embedding),
+    tokenizer: toCPointer(tokenizer),
+    system_prompt: toCPointer(systemPrompt),
+    user_prompt: toCPointer(userPrompt),
+    max_new_tokens: Int32(maxNewTokens),
+    temperature: temperature,
+    top_p: topP,
+    seed: Int32(seed)
+  )
+}
+
 func sherpaOnnxOfflineModelConfig(
   tokens: String,
   transducer: SherpaOnnxOfflineTransducerModelConfig = sherpaOnnxOfflineTransducerModelConfig(),
@@ -502,7 +536,11 @@ func sherpaOnnxOfflineModelConfig(
   wenetCtc: SherpaOnnxOfflineWenetCtcModelConfig =
     sherpaOnnxOfflineWenetCtcModelConfig(),
   omnilingual: SherpaOnnxOfflineOmnilingualAsrCtcModelConfig =
-    sherpaOnnxOfflineOmnilingualAsrCtcModelConfig()
+    sherpaOnnxOfflineOmnilingualAsrCtcModelConfig(),
+  medasr: SherpaOnnxOfflineMedAsrCtcModelConfig =
+    sherpaOnnxOfflineMedAsrCtcModelConfig(),
+  funasrNano: SherpaOnnxOfflineFunASRNanoModelConfig =
+    sherpaOnnxOfflineFunASRNanoModelConfig()
 ) -> SherpaOnnxOfflineModelConfig {
   return SherpaOnnxOfflineModelConfig(
     transducer: transducer,
@@ -525,7 +563,9 @@ func sherpaOnnxOfflineModelConfig(
     zipformer_ctc: zipformerCtc,
     canary: canary,
     wenet_ctc: wenetCtc,
-    omnilingual: omnilingual
+    omnilingual: omnilingual,
+    medasr: medasr,
+    funasr_nano: funasrNano
   )
 }
 

@@ -229,6 +229,7 @@ if(SHERPA_ONNX_ENABLE_ASCEND_NPU)
   list(APPEND sources
     ./ascend/offline-paraformer-model-ascend.cc
     ./ascend/offline-sense-voice-model-ascend.cc
+    ./ascend/offline-whisper-model-ascend.cc
     ./ascend/offline-zipformer-ctc-model-ascend.cc
     ./ascend/utils.cc
   )
@@ -244,6 +245,13 @@ if(SHERPA_ONNX_ENABLE_QNN)
     ./qnn/utils.cc
   )
 endif()
+
+list(APPEND sources
+  offline-funasr-nano-model-config.cc
+  offline-funasr-nano-model.cc
+  offline-recognizer-funasr-nano-impl.cc
+  funasr-nano-tokenizer.cc
+)
 
 if(SHERPA_ONNX_ENABLE_TTS)
   list(APPEND sources

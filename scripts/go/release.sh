@@ -54,8 +54,8 @@ function linux() {
   dst=$(realpath sherpa-onnx-go-linux/lib/arm-unknown-linux-gnueabihf)
   mkdir t
   cd t
-  wget -q https://huggingface.co/csukuangfj/sherpa-onnx-wheels/resolve/main/cpu/$SHERPA_ONNX_VERSION/sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-linux_armv7l.whl
-  unzip ./sherpa_onnx-${SHERPA_ONNX_VERSION}-cp38-cp38-linux_armv7l.whl
+  wget -q https://huggingface.co/csukuangfj/sherpa-onnx-wheels/resolve/main/cpu/$SHERPA_ONNX_VERSION/sherpa_onnx_core-$SHERPA_ONNX_VERSION-py3-none-manylinux_2_35_armv7l.whl
+  unzip ./sherpa_onnx_core-$SHERPA_ONNX_VERSION-py3-none-manylinux_2_35_armv7l.whl
 
   rm -fv $dst/_sherpa*.so
   cp -v sherpa_onnx/lib/lib*.so* $dst
@@ -94,7 +94,7 @@ function osx() {
   cp -v sherpa_onnx/lib/*.dylib $dst/
 
   pushd $dst
-  cp -v libonnxruntime.1.17.1.dylib libonnxruntime.dylib
+  cp -v libonnxruntime.*.dylib libonnxruntime.dylib
   popd
 
   cd ..
@@ -112,7 +112,7 @@ function osx() {
   cp -v sherpa_onnx/lib/*.dylib $dst/
 
   pushd $dst
-  cp -v libonnxruntime.1.17.1.dylib libonnxruntime.dylib
+  cp -v libonnxruntime.*.dylib libonnxruntime.dylib
   popd
 
   cd ..
@@ -172,7 +172,25 @@ function windows() {
   rm -rf sherpa-onnx-go-windows
 }
 
+function basic() {
+  echo "Process sherpa-onnx-go"
+  git clone git@github.com:k2-fsa/sherpa-onnx-go.git
 
+  python3 ./generate.py -s ./sherpa_onnx.go -o ./sherpa-onnx-go
+
+  echo "------------------------------"
+  cd sherpa-onnx-go
+  git status
+  git add .
+  git commit -m "Release v$SHERPA_ONNX_VERSION" && \
+    git push && \
+    git tag v$SHERPA_ONNX_VERSION && \
+    git push origin v$SHERPA_ONNX_VERSION
+  cd ..
+  rm -rf sherpa-onnx-go
+}
+
+basic
 windows
 linux
 osx
