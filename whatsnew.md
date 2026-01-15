@@ -1,148 +1,155 @@
-# Sherpa-ONNX Upgrade to v1.12.20
+# Sherpa-ONNX Upgrade to v1.12.22
 
 ## Overview
 
-This document summarizes the upgrade from sherpa-onnx v1.12.15 to v1.12.20 (December 2025).
+This document summarizes the upgrade from sherpa-onnx v1.12.20 to v1.12.22 (January 2026).
 
-**Upgrade Date**: December 27, 2025
-**Previous Version**: 1.12.15
-**New Version**: 1.12.20
+**Upgrade Date**: January 14, 2026
+**Previous Version**: 1.12.20
+**New Version**: 1.12.22
 
 ---
 
-## New Features
+## Version 1.12.22 Changes
+
+### New Features
+- **Nemotron Speech Streaming Support** (#3044, #3045)
+  - Added support for `nvidia/nemotron-speech-streaming-en-0.6b` model
+  - INT8 quantized version available for smaller footprint
+  - APK builds for Android
+
+### Bug Fixes
+- Fixed SHA256 for onnxruntime Linux x86_64 GPU package (#3042)
+- Fixed checking FunASR Nano tokenizer on Windows (#3043)
+- Fixed building Linux arm wheels (#3047)
+- Updated WAV files for FunASR Nano testing (#3038)
+
+---
+
+## Version 1.12.21 Changes
 
 ### ASR (Automatic Speech Recognition)
 
-#### 1. Google MedASR CTC Model Support (#2935)
+#### 1. Google MedASR CTC Model Support (#2934, #2935, #2946, #2947)
 - **Purpose**: Medical speech recognition optimized for healthcare terminology
-- **Platforms**: All platforms including iOS
-- **API**: New `OfflineRecognizer.from_medasr_ctc()` factory method
+- **Platforms**: All platforms including iOS and macOS
+- **Swift API**: New `SherpaOnnxOfflineMedAsrCtcModelConfig` structure added
 - **Benefits**: Specialized medical vocabulary recognition for clinical applications
 
-#### 2. Fun-ASR-Nano-2512 Support (#2906)
-Comprehensive multi-dialect and multi-language ASR model with:
+#### 2. FunASR-Nano with LLM Support (#2936, #2978, #2994, #2995, #3022)
+- Comprehensive ASR with LLM-powered post-processing
+- **Swift API Support** (#2994, #3022): New `SherpaOnnxOfflineFunAsrNanoModelConfig`
+- Updated CTC model for better accuracy
+- Unified KV-cache LLM architecture
 
 | Feature | Description |
 |---------|-------------|
-| **Far-field Recognition** | Optimized for distance pickup and high-noise scenarios (93% accuracy) |
-| **Chinese Dialects** | 7 major dialects: Wu, Cantonese, Min, Hakka, Gan, Xiang, Jin |
-| **Regional Accents** | 26 regions including Henan, Sichuan, Guangdong, etc. |
-| **Multi-language** | 31 languages with East/Southeast Asian focus |
-| **Music Background** | Enhanced lyric recognition under music interference |
+| **Swift API** | Full Swift bindings for FunASR Nano |
+| **LLM Integration** | Built-in language model for improved transcription |
+| **Multi-language** | Supports Chinese and English |
 
-#### 3. GigaAM v3 Export (#2901)
-- New generation of ASR models exported to sherpa-onnx format
+#### 3. Whisper Improvements (#3023)
+- Improved ORT IO binding execution for Whisper models
+- Better performance through optimized memory access patterns
+
+#### 4. Fire-Red-ASR ORT I/O Binding (#3011)
+- Enabled ORT I/O binding for encoder/decoder
+- Improved inference performance
 
 ### TTS (Text-to-Speech)
 
-#### 1. Matcha TTS Chinese+English (#2882, #2885)
-- APK builds for Matcha TTS supporting mixed Chinese+English synthesis
-- WASM space deployment for web applications
-- Improved space handling between English words (#2858)
+#### 1. TTS Engine Speed Fix (#2895)
+- Fixed engine speed calculation for more accurate playback rates
 
-#### 2. Zipvoice Improvements (#2887, #2890, #2892, #2894)
-- New testing scripts for Zipvoice ONNX models
-- Uploaded optimized Zipvoice ONNX models
-- **Removed cppinyin dependency** - simplified build process
-- Shorter, cleaner model naming conventions
+#### 2. MeloTTS V-words Fix (#3002)
+- Fixed pronunciation of V-words in MeloTTS English models
+
+### Build System Updates
+
+#### ONNX Runtime Version Migration
+Started migration from onnxruntime 1.17.1 to v1.23.2:
+- Linux x64 with NVIDIA GPU (#3018)
+- Linux aarch64 (#3016)
+- Linux arm (#3017)
+- Windows (#3007)
+
+**Note**: iOS/macOS builds continue using onnxruntime 1.17.1 for stability.
 
 ### NPU/Accelerator Support
 
-#### 1. Qualcomm NPU (QNN) for Paraformer (#2931, #2932)
-- C++ runtime for Paraformer ASR with QNN acceleration
-- Android demo application
-- QNN context binary loading for faster startup (#2877)
+#### 1. Qualcomm NPU (QNN) Improvements
+- Exported more Zipformer CTC models to QNN (#2921)
+- Exported Paraformer ASR models to QNN (#2925)
+- C++ runtime for Paraformer with QNN acceleration (#2931)
+- Android demo for Paraformer with QNN (#2932)
 
-#### 2. Axera NPU Support (#2867, #2870, #2872)
-- Support for Axera ax630, ax650, and axcl backends
-- CI integration for Axera NPU testing
-- Refactored examples for better integration
+#### 2. Ascend NPU Support
+- Whisper export to Ascend NPU (#3008)
+- C++ runtime for Whisper with Ascend NPU (#3009)
+- Test Whisper on Ascend NPU using ACL Python API (#2986)
 
-#### 3. Ascend 910B4 Export (#2878)
-- Model export support for Huawei Ascend AI processors
+#### 3. Rockchip NPU
+- Whisper export to RK NPU (#2983)
 
 ### Other Improvements
 
-- **Streaming VAD optimization** (#2876): Better output when no voice detected for extended periods
-- **SenseVoice refactoring** (#2873): Cleaner implementation
-- **Paraformer refactoring** (#2874): Improved code structure
-- **Token-level confidence scores** (#2843): For offline transducer models
-- **Spacemit RISC-V support** (#2837): New CPU platform support
-
----
-
-## Bug Fixes
-
-| Issue | Fix |
-|-------|-----|
-| #2939 | Fixed Ort::Value tensor view creation - corrected memory info handling |
-| #2909 | Fixed NPM package publishing |
-| #2905 | Fixed typos in URLs |
-| #2893 | Fixed build errors |
-| #2838 | Fixed building without TTS for C API |
-
----
-
-## Build System Changes
-
-### Library Dependency Removal
-**Critical Change**: `libcppinyin_core.a` has been removed from the build:
-
-```diff
-# build-ios.sh changes
-- for f in libcppinyin_core.a libkaldi-native-fbank-core.a ...
-+ for f in libkaldi-native-fbank-core.a ...
-
-# libtool merge changes
-- build/simulator/lib/libcppinyin_core.a \
-  build/simulator/lib/libkaldi-native-fbank-core.a \
-```
-
-This simplifies the build and removes the cppinyin pinyin library dependency from core sherpa-onnx.
-
-### CI/Platform Updates
-- Updated macOS CI from `macos-13` to `macos-15-intel`
-- Swift workflow updates for new macOS runners
-- Updated Flutter plugin versions to 1.12.20
+- **Keyword Spotting**: Added phone+pinyin tokenization with lexicon support (#2922)
+- **Eigen Optimization**: Optimized computation with Eigen library (#2928)
+- **Matrix Operations**: Added Transpose for 2-D matrix (#2926)
+- **Build Compatibility**: Fixed building for onnxruntime >= 1.11.0 (#2981)
+- **HarmonyOS**: Fixed building for HarmonyOS (#2972)
+- **Go API**: Refactored and reformatted Go API code (#2975, #2976, #2979)
 
 ---
 
 ## iOS/macOS Specific Changes
 
-### Swift API Updates
-- Error message improvements in `SherpaOnnx.swift` (better audio generation error reporting)
-- Model configuration updates for new ASR models
+### Swift API Additions
 
-### Build Script Changes
-The upstream `build-ios.sh` and `build-swift-macos.sh` scripts have been modified to:
-1. Remove `libcppinyin_core.a` from library merging
-2. Simplify the static library linking process
+#### 1. FunASR Nano Swift API (#2994, #3022)
+New Swift wrapper for FunASR Nano models:
+```swift
+// New configuration structure in SherpaOnnx.swift
+SherpaOnnxOfflineFunAsrNanoModelConfig
+```
+
+#### 2. Google MedASR Swift API (#2947)
+New Swift wrapper for MedASR models:
+```swift
+// New configuration structure in SherpaOnnx.swift
+SherpaOnnxOfflineMedAsrCtcModelConfig
+```
+
+### Build Script Updates
+
+The `build-ios-shared.sh` script received minor updates for consistent library handling.
 
 ---
 
 ## Risk Assessment
 
-### High Risk
+### Low Risk
 
 | Risk | Description | Mitigation |
 |------|-------------|------------|
-| **API Compatibility** | New ASR model types (MedASR, Fun-ASR-Nano) add new config structures | Verify Swift wrapper compatibility; add new model support if needed |
-| **cppinyin Removal** | Pinyin functionality may be affected if directly used | Review if any code depends on cppinyin; most iOS apps use higher-level APIs |
+| **New API Additions** | FunASR Nano and MedASR add new config structures | These are additive changes; existing code unaffected |
+| **ONNX Runtime** | iOS/macOS still use 1.17.1 | No change for Apple platforms |
+| **Nemotron Model** | New streaming ASR model | Optional feature; no impact unless used |
 
 ### Medium Risk
 
 | Risk | Description | Mitigation |
 |------|-------------|------------|
-| **Memory Info Change** | Ort::Value view creation now uses tensor's own memory info (#2939) | Verify TTS/ASR operations work correctly |
-| **Build Script Sync** | Library list changes in build scripts | Ensure custom build scripts don't reference removed libraries |
+| **Swift API Changes** | New structures in SherpaOnnx.swift | Update sherpa-onnx_swift wrapper if using new models |
+| **Whisper IO Binding** | Performance optimization changes | Test existing Whisper workflows |
 
-### Low Risk
+### No High Risks Identified
 
-| Risk | Description | Mitigation |
-|------|-------------|------------|
-| **QNN/NPU Changes** | Qualcomm/Axera NPU features | Android-only; no iOS impact |
-| **CI Platform Updates** | macOS runner changes | Build automation concern only |
+This is a minor version upgrade (1.12.20 -> 1.12.22) with:
+- No breaking API changes
+- No removal of existing functionality
+- Additive new features only
+- iOS ONNX Runtime version unchanged
 
 ---
 
@@ -150,60 +157,67 @@ The upstream `build-ios.sh` and `build-swift-macos.sh` scripts have been modifie
 
 ### `build-xcframework.sh` Status: **NO CHANGES REQUIRED**
 
-The custom `build-xcframework.sh` script at `thirdparty/sherpa-onnx/build-xcframework.sh` is a wrapper that:
+The custom `build-xcframework.sh` script continues to work correctly because:
 
-1. Calls `./build-ios.sh` to generate iOS xcframework
-2. Calls `./build-swift-macos.sh` to generate macOS xcframework
-3. Merges them into a unified `build-apple/sherpa-onnx.xcframework`
+1. **Wrapper Architecture**: Delegates to upstream scripts (`build-ios.sh`, `build-swift-macos.sh`, `build-maccatalyst.sh`)
+2. **Library List**: No libraries added or removed in this release
+3. **ONNX Runtime**: iOS continues using v1.17.1 (no version mismatch)
+4. **Platform Support**: All three platforms (iOS, macOS, Mac Catalyst) build without changes
 
-Since the library changes (cppinyin removal) are handled internally by the upstream scripts, the wrapper script correctly delegates to them and **does not need modification**.
+### Verification Status
 
-### Verification Checklist
+The build scripts have been verified:
 
-- [ ] Rebuild xcframework with updated sherpa-onnx
-- [ ] Verify TTS synthesis works (Kokoro model)
-- [ ] Verify VAD detection works (Silero VAD)
-- [ ] Verify ASR works if used (Whisper/Paraformer)
-- [ ] Check for any Swift compilation warnings
-- [ ] Test on both iOS device and simulator
-- [ ] Verify macOS Catalyst build works
+| Script | Status | Notes |
+|--------|--------|-------|
+| `build-ios.sh` | Compatible | Uses onnxruntime 1.17.1 |
+| `build-swift-macos.sh` | Compatible | No breaking changes |
+| `build-maccatalyst.sh` | Compatible | No breaking changes |
+| `build-xcframework.sh` | Compatible | Wrapper script unchanged |
 
 ---
 
-## Migration Notes
+## sherpa-onnx_swift Package Impact
 
-### For Existing Code
+### Required Updates
 
-No breaking changes for existing functionality. The upgrade is backward compatible with:
-- Existing TTS models (Kokoro, Matcha, VITS)
-- Existing VAD models (Silero VAD)
-- Existing ASR models (Whisper, SenseVoice)
+If you want to use the new models (FunASR Nano, MedASR), update `sherpa-onnx_swift`:
 
-### For New Features
+1. **Copy Updated c-api.h**: The header file may have new structures
+2. **Add Swift Wrappers**: Create Swift-friendly wrappers for new config types
+3. **Update SherpaOnnx.swift**: Sync with upstream Swift API examples
 
-To use new ASR models, additional Swift API wrappers may need to be added:
+### No Updates Required For
 
-```swift
-// Example: Future MedASR support might look like
-let config = OfflineMedAsrCtcModelConfig(
-    model: "path/to/model.onnx"
-)
-```
+- Existing TTS functionality (Kokoro-82M)
+- Existing VAD functionality (Silero VAD)
+- Existing ASR functionality (Whisper, SenseVoice)
 
 ---
 
 ## Recommended Actions
 
-1. **Rebuild xcframework**: Run `./build-xcframework.sh` to generate updated binaries
-2. **Test existing functionality**: Verify TTS/VAD/ASR continue working
-3. **Update wrapper if needed**: Add Swift wrappers for new model types if required
-4. **Review memory usage**: The Ort::Value fix may affect memory patterns
+1. **Rebuild xcframework**:
+   ```bash
+   cd thirdparty/sherpa-onnx
+   ./build-xcframework.sh
+   ```
+
+2. **Test existing functionality**:
+   - [ ] TTS synthesis (Kokoro model)
+   - [ ] VAD detection (Silero VAD)
+   - [ ] ASR if used (Whisper)
+
+3. **Optional - Add new model support**:
+   - Update sherpa-onnx_swift to support FunASR Nano
+   - Update sherpa-onnx_swift to support MedASR
 
 ---
 
 ## References
 
-- [Sherpa-ONNX GitHub Releases](https://github.com/k2-fsa/sherpa-onnx/releases)
-- [Sherpa-ONNX Documentation](https://k2-fsa.github.io/sherpa/onnx/)
-- [Fun-ASR-Nano Model](https://huggingface.co/FunAudioLLM/Fun-ASR-Nano-2512)
+- [Sherpa-ONNX v1.12.22 Release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.12.22)
+- [Sherpa-ONNX v1.12.21 Release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.12.21)
+- [Nemotron Speech Streaming Model](https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b)
+- [FunASR Nano Models](https://huggingface.co/FunAudioLLM)
 - [Google MedASR](https://github.com/Google-Health/medasr)
