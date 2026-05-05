@@ -1,16 +1,26 @@
 /** @typedef {import('./types').OfflineStreamObject} OfflineStreamObject */
 /** @typedef {import('./types').Waveform} Waveform */
-/** @typedef {import('./types').OfflineRecognizerConfig} OfflineRecognizerConfig */
-/** @typedef {import('./types').OfflineRecognizerResult} OfflineRecognizerResult */
+/**
+ * @typedef {import('./types').OfflineRecognizerConfig} OfflineRecognizerConfig
+ */
+/**
+ * @typedef {import('./types').OfflineRecognizerResult} OfflineRecognizerResult
+ */
 
 const addon = require('./addon.js');
+
+/**
+ * Internal symbol to mark async-created recognizers.
+ * Not accessible unless someone has a reference to this Symbol.
+ */
+const kFromAsyncFactory = Symbol('OfflineRecognizer.fromAsync');
 
 /**
  * OfflineStream represents a synchronous offline audio stream.
  */
 class OfflineStream {
   /**
-   * @param {OfflineStreamObject|Object} handle - Internal stream object with `handle` property.
+   * @param {OfflineStreamObject|Object} handle
    */
   constructor(handle) {
     this.handle = handle;
@@ -21,7 +31,16 @@ class OfflineStream {
    * @param {Waveform} obj - { samples: Float32Array, sampleRate: number }
    */
   acceptWaveform(obj) {
-    addon.acceptWaveformOffline(this.handle, obj)
+    addon.acceptWaveformOffline(this.handle, obj);
+  }
+
+  /**
+   * Set a string option on the underlying offline stream.
+   * @param {string} key
+   * @param {string} value
+   */
+  setOption(key, value) {
+    addon.offlineStreamSetOption(this.handle, key, value);
   }
 }
 
@@ -30,11 +49,43 @@ class OfflineStream {
  */
 class OfflineRecognizer {
   /**
-   * @param {OfflineRecognizerConfig} config
+   * Constructor (SYNC path).
+   *
+   * Users call:
+   *   new OfflineRecognizer(config)
+   *
+   * Async factory calls this with an internal descriptor.
+   *
+   * @param {OfflineRecognizerConfig | Object} configOrInternal
    */
-  constructor(config) {
-    this.handle = addon.createOfflineRecognizer(config);
-    this.config = config
+  constructor(configOrInternal) {
+    // ----- async factory path -----
+    if (configOrInternal && typeof configOrInternal === 'object' &&
+        configOrInternal[kFromAsyncFactory]) {
+      this.handle = configOrInternal.handle;
+      this.config = configOrInternal.config;
+      return;
+    }
+
+    // ----- sync constructor path -----
+    this.config = configOrInternal;
+    this.handle = addon.createOfflineRecognizer(this.config);
+  }
+
+  /**
+   * Create an OfflineRecognizer asynchronously (non-blocking).
+   *
+   * @param {OfflineRecognizerConfig} config
+   * @returns {Promise<OfflineRecognizer>}
+   */
+  static async createAsync(config) {
+    const handle = await addon.createOfflineRecognizerAsync(config);
+
+    return new OfflineRecognizer({
+      [kFromAsyncFactory]: true,
+      handle,
+      config,
+    });
   }
 
   /**
@@ -51,6 +102,7 @@ class OfflineRecognizer {
    * @param {OfflineRecognizerConfig} config
    */
   setConfig(config) {
+    this.config = config;
     addon.offlineRecognizerSetConfig(this.handle, config);
   }
 
@@ -63,13 +115,23 @@ class OfflineRecognizer {
   }
 
   /**
+   * Decode an offline stream asynchronously (non-blocking).
+   * @param {OfflineStream} stream
+   * @returns {Promise<OfflineRecognizerResult>}
+   */
+  async decodeAsync(stream) {
+    const jsonStr =
+        await addon.decodeOfflineStreamAsync(this.handle, stream.handle);
+    return JSON.parse(jsonStr);
+  }
+
+  /**
    * Get recognition result for a stream.
    * @param {OfflineStream} stream
    * @returns {OfflineRecognizerResult}
    */
   getResult(stream) {
     const jsonStr = addon.getOfflineStreamResultAsJson(stream.handle);
-
     return JSON.parse(jsonStr);
   }
 }
@@ -77,4 +139,4 @@ class OfflineRecognizer {
 module.exports = {
   OfflineRecognizer,
   OfflineStream,
-}
+};

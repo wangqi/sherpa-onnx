@@ -81,6 +81,7 @@ cmake \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
   -DSHERPA_ONNX_ENABLE_PYTHON=OFF \
+  -DSHERPA_ONNX_ENABLE_BINARY=OFF \
   -DSHERPA_ONNX_ENABLE_TESTS=OFF \
   -DSHERPA_ONNX_ENABLE_CHECK=OFF \
   -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
@@ -90,7 +91,7 @@ cmake \
   -DDEPLOYMENT_TARGET=13.0 \
   -B build/simulator_x86_64
 
-cmake --build build/simulator_x86_64 -j 4 --verbose
+cmake --build build/simulator_x86_64 -j 4
 
 echo "Building for simulator (arm64)"
 
@@ -112,6 +113,7 @@ cmake \
   -DCMAKE_INSTALL_PREFIX=./install \
   -DBUILD_SHARED_LIBS=OFF \
   -DSHERPA_ONNX_ENABLE_PYTHON=OFF \
+  -DSHERPA_ONNX_ENABLE_BINARY=OFF \
   -DSHERPA_ONNX_ENABLE_TESTS=OFF \
   -DSHERPA_ONNX_ENABLE_CHECK=OFF \
   -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
@@ -121,7 +123,7 @@ cmake \
   -DDEPLOYMENT_TARGET=13.0 \
   -B build/simulator_arm64
 
-cmake --build build/simulator_arm64 -j 4 --verbose
+cmake --build build/simulator_arm64 -j 4
 
 echo "Building for arm64"
 
@@ -145,6 +147,7 @@ cmake \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
   -DSHERPA_ONNX_ENABLE_PYTHON=OFF \
+  -DSHERPA_ONNX_ENABLE_BINARY=OFF \
   -DSHERPA_ONNX_ENABLE_TESTS=OFF \
   -DSHERPA_ONNX_ENABLE_CHECK=OFF \
   -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
