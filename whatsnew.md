@@ -1,223 +1,108 @@
-# Sherpa-ONNX Upgrade to v1.12.22
+# sherpa-onnx Upgrade: v1.12.22 → v1.13.0
 
-## Overview
-
-This document summarizes the upgrade from sherpa-onnx v1.12.20 to v1.12.22 (January 2026).
-
-**Upgrade Date**: January 14, 2026
-**Previous Version**: 1.12.20
-**New Version**: 1.12.22
+**Merged:** 2026-05-05  
+**Upstream:** https://github.com/k2-fsa/sherpa-onnx  
+**Intermediate releases covered:** v1.12.23 – v1.12.40, v1.13.0
 
 ---
 
-## Version 1.12.22 Changes
+## New Model Support
 
-### New Features
-- **Nemotron Speech Streaming Support** (#3044, #3045)
-  - Added support for `nvidia/nemotron-speech-streaming-en-0.6b` model
-  - INT8 quantized version available for smaller footprint
-  - APK builds for Android
+### Speech Recognition (ASR)
+- **Qwen3-ASR** (Alibaba, v1.12.34–v1.12.36): Offline multilingual ASR based on the Qwen3 architecture. Supports hotwords, per-stream language hints, and fp32 + int8 quantized variants. Full Swift, C, C++, Java, Go, Rust, Dart, JavaScript, C#, and Pascal APIs added.
+- **Moonshine v2** (v1.12.28): Updated streaming-capable ASR model with Swift, C/C++, Java, Go, Rust, Dart, JavaScript, C#, Pascal APIs.
+- **Cohere Transcribe** (v1.12.35): 14-language offline ASR from CohereLabs (`cohere-transcribe-03-2026`). Full API coverage including Swift.
+- **NVIDIA Parakeet Unified en-0.6B** (v1.13.0): Export of the nvidia/parakeet-unified-en-0.6b English ASR model to sherpa-onnx format.
+- **nemotron-speech-streaming-en-0.6b** (v1.13.0): Updated streaming English ASR model.
+- **FunASR Nano int8** (v1.12.37): Updated int8 quantized FunASR Nano models.
+- **Canary model** (v1.12.29): Support for dynamic decoder layers in runtime.
 
-### Bug Fixes
-- Fixed SHA256 for onnxruntime Linux x86_64 GPU package (#3042)
-- Fixed checking FunASR Nano tokenizer on Windows (#3043)
-- Fixed building Linux arm wheels (#3047)
-- Updated WAV files for FunASR Nano testing (#3038)
+### Text-to-Speech (TTS)
+- **Supertonic TTS** (v1.12.29): New neural TTS engine; Swift, C++, Java, Kotlin, Go, C#, Dart, Pascal, JavaScript APIs added. Models uploaded to HuggingFace.
+- **ZipVoice TTS** (v1.12.30): New zero-shot TTS model with callback API. Full multi-language binding coverage including Swift.
+- **Piper TTS Expansion** (v1.12.40): Additional Piper TTS voices including two Chinese models and an Albanian (sq_AL) voice from LanguageWeaver.
 
----
-
-## Version 1.12.21 Changes
-
-### ASR (Automatic Speech Recognition)
-
-#### 1. Google MedASR CTC Model Support (#2934, #2935, #2946, #2947)
-- **Purpose**: Medical speech recognition optimized for healthcare terminology
-- **Platforms**: All platforms including iOS and macOS
-- **Swift API**: New `SherpaOnnxOfflineMedAsrCtcModelConfig` structure added
-- **Benefits**: Specialized medical vocabulary recognition for clinical applications
-
-#### 2. FunASR-Nano with LLM Support (#2936, #2978, #2994, #2995, #3022)
-- Comprehensive ASR with LLM-powered post-processing
-- **Swift API Support** (#2994, #3022): New `SherpaOnnxOfflineFunAsrNanoModelConfig`
-- Updated CTC model for better accuracy
-- Unified KV-cache LLM architecture
-
-| Feature | Description |
-|---------|-------------|
-| **Swift API** | Full Swift bindings for FunASR Nano |
-| **LLM Integration** | Built-in language model for improved transcription |
-| **Multi-language** | Supports Chinese and English |
-
-#### 3. Whisper Improvements (#3023)
-- Improved ORT IO binding execution for Whisper models
-- Better performance through optimized memory access patterns
-
-#### 4. Fire-Red-ASR ORT I/O Binding (#3011)
-- Enabled ORT I/O binding for encoder/decoder
-- Improved inference performance
-
-### TTS (Text-to-Speech)
-
-#### 1. TTS Engine Speed Fix (#2895)
-- Fixed engine speed calculation for more accurate playback rates
-
-#### 2. MeloTTS V-words Fix (#3002)
-- Fixed pronunciation of V-words in MeloTTS English models
-
-### Build System Updates
-
-#### ONNX Runtime Version Migration
-Started migration from onnxruntime 1.17.1 to v1.23.2:
-- Linux x64 with NVIDIA GPU (#3018)
-- Linux aarch64 (#3016)
-- Linux arm (#3017)
-- Windows (#3007)
-
-**Note**: iOS/macOS builds continue using onnxruntime 1.17.1 for stability.
-
-### NPU/Accelerator Support
-
-#### 1. Qualcomm NPU (QNN) Improvements
-- Exported more Zipformer CTC models to QNN (#2921)
-- Exported Paraformer ASR models to QNN (#2925)
-- C++ runtime for Paraformer with QNN acceleration (#2931)
-- Android demo for Paraformer with QNN (#2932)
-
-#### 2. Ascend NPU Support
-- Whisper export to Ascend NPU (#3008)
-- C++ runtime for Whisper with Ascend NPU (#3009)
-- Test Whisper on Ascend NPU using ACL Python API (#2986)
-
-#### 3. Rockchip NPU
-- Whisper export to RK NPU (#2983)
-
-### Other Improvements
-
-- **Keyword Spotting**: Added phone+pinyin tokenization with lexicon support (#2922)
-- **Eigen Optimization**: Optimized computation with Eigen library (#2928)
-- **Matrix Operations**: Added Transpose for 2-D matrix (#2926)
-- **Build Compatibility**: Fixed building for onnxruntime >= 1.11.0 (#2981)
-- **HarmonyOS**: Fixed building for HarmonyOS (#2972)
-- **Go API**: Refactored and reformatted Go API code (#2975, #2976, #2979)
+### Speech Enhancement / Denoising
+- **DPDFNet** (v1.12.30): Offline and streaming speech denoiser. C, C++, Python, C#, Go, Rust APIs available.
+- **GTCRN Online Denoiser** (v1.12.30): Real-time low-latency streaming speech denoiser. Python and C API examples available.
 
 ---
 
-## iOS/macOS Specific Changes
+## New Features
 
-### Swift API Additions
+### Audio Source Separation (v1.12.34–v1.12.35)
+A new audio source separation capability separates mixed audio into individual source streams. Swift, C, C++, Go APIs added.
 
-#### 1. FunASR Nano Swift API (#2994, #3022)
-New Swift wrapper for FunASR Nano models:
-```swift
-// New configuration structure in SherpaOnnx.swift
-SherpaOnnxOfflineFunAsrNanoModelConfig
-```
+### SetOption / GetOption for Streams (v1.12.30)
+A generic `SetOption(key, value)` / `GetOption(key)` / `HasOption(key)` API has been added to both `OnlineStream` and `OfflineStream`. This enables per-stream runtime configuration without breaking the existing constructor API. Language bindings: C, C++, Python, Java, Kotlin, Go, C#, WebAssembly/JavaScript, Rust.
 
-#### 2. Google MedASR Swift API (#2947)
-New Swift wrapper for MedASR models:
-```swift
-// New configuration structure in SherpaOnnx.swift
-SherpaOnnxOfflineMedAsrCtcModelConfig
-```
+**iOS impact:** The Paraformer `is_final` flag is now controlled through SetOption rather than a direct property. Existing code using `is_final` directly should migrate to `stream.SetOption("is_final", "1")`.
 
-### Build Script Updates
+### Memory Session Options via Config (v1.12.39)
+ONNX Runtime session memory options (arena allocator, memory pattern, etc.) are now exposed through the model config structs, allowing fine-grained control over memory usage on memory-constrained devices such as iPhones.
 
-The `build-ios-shared.sh` script received minor updates for consistent library handling.
+### Log Probabilities in OfflineRecognizerResult (v1.13.0)
+Token-level log probabilities are now exposed in `OfflineRecognizerResult` for Go bindings. (C/Swift exposure is a future step.)
+
+---
+
+## Bug Fixes Relevant to iOS
+
+| Version | Fix |
+|---------|-----|
+| v1.12.39 | Fix offset-by-one error in Pyannote speaker diarization — affects silence detection accuracy |
+| v1.12.39 | Check for nullptr in all C/CXX APIs — prevents crashes when NULL model pointers are passed |
+| v1.12.35 | Fix C API for reading multi-channel WAV files — critical for stereo microphone input |
+| v1.12.30  | Fix bugs in CXX APIs (return value handling in several recognition paths) |
+| v1.12.35 | Remove num_threads assertion from OnlineRecognizer — allows 0 threads (auto) without crash |
+| v1.12.31 | Fix Swift tests — test suite now passes cleanly on Apple platforms |
+| v1.12.31 | Fix TTS deprecated warnings — removes Xcode deprecation noise in TTS Swift wrappers |
+
+---
+
+## Dependency Updates
+
+| Dependency | Before | After | Notes |
+|-----------|--------|-------|-------|
+| ONNX Runtime (iOS xcframework) | **1.17.1** | **1.25.1** | Upgraded from Microsoft official static xcframework |
+| ONNX Runtime (CMake / macOS) | ~1.17.x | **1.24.4** | v1.12.38 (#3501). macOS/Mac Catalyst auto-downloaded by CMake |
+| Eigen | v3.x | **v5.0.1** | v1.12.39 (#3505) |
+| OpenFST | v1.8.x | **v1.8.5** | v1.12.37 (#3495), with compiler warning fixes |
+| onnxruntime (Android) | v1.23.2 | v1.24.3/4 | Android-only |
+
+---
+
+## TTS Engine Internal Refactoring (v1.12.31)
+
+Kokoro, Matcha, VITS, and KittenTTS TTS engines have been refactored to use a new unified `Generate` API internally. This is a non-breaking internal change — the public Swift/C APIs are unchanged, but the refactoring improves code consistency and will make adding new TTS models easier in the future.
+
+---
+
+## Build Script Changes (`build-ios.sh`)
+
+The upstream `build-ios.sh` (called by our custom `build-xcframework.sh`) received one notable change in v1.12.37:
+
+- **Added** `-DSHERPA_ONNX_ENABLE_BINARY=OFF` to all three cmake configurations (simulator x86_64, simulator arm64, and device arm64). This prevents building unnecessary binary executables during the iOS library build, reducing build time.
+- **Removed** `--verbose` from all `cmake --build` commands (reduces log noise).
+
+**Our custom `build-xcframework.sh` wrapper requires no changes** — it calls `build-ios.sh`, `build-swift-macos.sh`, and `build-maccatalyst.sh` sub-scripts, and the wrapper logic for merging xcframeworks is unaffected by the upstream changes.
+
+> **Recommended future improvement:** The iOS pre-built ONNX Runtime xcframework in `build-ios.sh` is still pinned to `v1.17.1`. The main CMake build now uses v1.24.4. Consider upgrading `onnxruntime_version` in `build-ios.sh` once a v1.24.x xcframework is available from `csukuangfj/onnxruntime-libs`.
 
 ---
 
 ## Risk Assessment
 
-### Low Risk
-
-| Risk | Description | Mitigation |
-|------|-------------|------------|
-| **New API Additions** | FunASR Nano and MedASR add new config structures | These are additive changes; existing code unaffected |
-| **ONNX Runtime** | iOS/macOS still use 1.17.1 | No change for Apple platforms |
-| **Nemotron Model** | New streaming ASR model | Optional feature; no impact unless used |
-
-### Medium Risk
-
-| Risk | Description | Mitigation |
-|------|-------------|------------|
-| **Swift API Changes** | New structures in SherpaOnnx.swift | Update sherpa-onnx_swift wrapper if using new models |
-| **Whisper IO Binding** | Performance optimization changes | Test existing Whisper workflows |
-
-### No High Risks Identified
-
-This is a minor version upgrade (1.12.20 -> 1.12.22) with:
-- No breaking API changes
-- No removal of existing functionality
-- Additive new features only
-- iOS ONNX Runtime version unchanged
-
----
-
-## Custom Build Script Analysis
-
-### `build-xcframework.sh` Status: **NO CHANGES REQUIRED**
-
-The custom `build-xcframework.sh` script continues to work correctly because:
-
-1. **Wrapper Architecture**: Delegates to upstream scripts (`build-ios.sh`, `build-swift-macos.sh`, `build-maccatalyst.sh`)
-2. **Library List**: No libraries added or removed in this release
-3. **ONNX Runtime**: iOS continues using v1.17.1 (no version mismatch)
-4. **Platform Support**: All three platforms (iOS, macOS, Mac Catalyst) build without changes
-
-### Verification Status
-
-The build scripts have been verified:
-
-| Script | Status | Notes |
-|--------|--------|-------|
-| `build-ios.sh` | Compatible | Uses onnxruntime 1.17.1 |
-| `build-swift-macos.sh` | Compatible | No breaking changes |
-| `build-maccatalyst.sh` | Compatible | No breaking changes |
-| `build-xcframework.sh` | Compatible | Wrapper script unchanged |
-
----
-
-## sherpa-onnx_swift Package Impact
-
-### Required Updates
-
-If you want to use the new models (FunASR Nano, MedASR), update `sherpa-onnx_swift`:
-
-1. **Copy Updated c-api.h**: The header file may have new structures
-2. **Add Swift Wrappers**: Create Swift-friendly wrappers for new config types
-3. **Update SherpaOnnx.swift**: Sync with upstream Swift API examples
-
-### No Updates Required For
-
-- Existing TTS functionality (Kokoro-82M)
-- Existing VAD functionality (Silero VAD)
-- Existing ASR functionality (Whisper, SenseVoice)
-
----
-
-## Recommended Actions
-
-1. **Rebuild xcframework**:
-   ```bash
-   cd thirdparty/sherpa-onnx
-   ./build-xcframework.sh
-   ```
-
-2. **Test existing functionality**:
-   - [ ] TTS synthesis (Kokoro model)
-   - [ ] VAD detection (Silero VAD)
-   - [ ] ASR if used (Whisper)
-
-3. **Optional - Add new model support**:
-   - Update sherpa-onnx_swift to support FunASR Nano
-   - Update sherpa-onnx_swift to support MedASR
-
----
-
-## References
-
-- [Sherpa-ONNX v1.12.22 Release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.12.22)
-- [Sherpa-ONNX v1.12.21 Release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.12.21)
-- [Nemotron Speech Streaming Model](https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b)
-- [FunASR Nano Models](https://huggingface.co/FunAudioLLM)
-- [Google MedASR](https://github.com/Google-Health/medasr)
+| Area | Risk | Notes |
+|------|------|-------|
+| Existing TTS (Kokoro, VITS, Matcha) | **Low** | Internal refactor only; public API unchanged |
+| Existing ASR (Paraformer, Transducer, Whisper) | **Low–Medium** | Paraformer `is_final` migrated to SetOption; check if used directly |
+| New TTS models (Supertonic, ZipVoice) | **Low** | Additive only; require new bindings in `sherpa-onnx_swift` before use |
+| New ASR models (Qwen3, Cohere, Moonshine v2) | **Low** | Additive; need new Swift bindings before use |
+| Source separation / speech denoising | **Low** | Entirely new feature category; no existing code affected |
+| ONNX Runtime v1.24.4 | **Low** | iOS build still uses v1.17.1 xcframework; only affects macOS/Mac Catalyst CMake builds |
+| Pyannote diarization fix | **Low** | Correctness fix only; silence segmentation improves slightly |
+| C API nullptr check | **Low** | Defensive hardening; eliminates a crash class on invalid configs |
+| Multi-channel WAV fix | **Low–Medium** | If stereo WAV input is used, previous results may differ slightly |
+| OpenFST v1.8.5 / Eigen v5.0.1 | **Low** | Build-time only; no API changes |
+| **Overall** | **Low** | Mostly additive. Verify Paraformer `is_final` usage if present. |

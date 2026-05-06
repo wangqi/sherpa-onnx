@@ -5,7 +5,7 @@ set -e
 dir=build-ios
 mkdir -p $dir
 cd $dir
-onnxruntime_version=1.17.1
+onnxruntime_version=1.25.1
 onnxruntime_dir=ios-onnxruntime/$onnxruntime_version
 
 IOS_DEVICE_SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
@@ -39,22 +39,42 @@ if [ "$SHERPA_ONNX_GITHUB_MIRROW" == true ]; then
     SHERPA_ONNX_GITHUB=hub.nuaa.cf
 fi
 
-if [ ! -f $onnxruntime_dir/onnxruntime.xcframework/ios-arm64/onnxruntime.a ]; then
+# v1.25.1 uses .framework bundles inside the xcframework slices (not raw .a files).
+# Detection check: look for the framework binary in the device slice.
+if [ ! -f $onnxruntime_dir/onnxruntime.xcframework/ios-arm64/onnxruntime.framework/onnxruntime ]; then
   mkdir -p $onnxruntime_dir
-  pushd $onnxruntime_dir
-  wget -c https://${SHERPA_ONNX_GITHUB}/csukuangfj/onnxruntime-libs/releases/download/v${onnxruntime_version}/onnxruntime.xcframework-${onnxruntime_version}.tar.bz2
-  tar xvf onnxruntime.xcframework-${onnxruntime_version}.tar.bz2
-  rm onnxruntime.xcframework-${onnxruntime_version}.tar.bz2
+  # Prefer a pre-downloaded local copy in ~/Downloads (avoids re-downloading on clean builds).
+  LOCAL_DOWNLOAD="$HOME/Downloads/onnxruntime-ios-static-xcframework-${onnxruntime_version}/onnxruntime.xcframework"
+  if [ -d "$LOCAL_DOWNLOAD" ]; then
+    echo "Copying onnxruntime xcframework from $LOCAL_DOWNLOAD"
+    cp -r "$LOCAL_DOWNLOAD" "$onnxruntime_dir/onnxruntime.xcframework"
+  else
+    # Fall back to official Microsoft GitHub release.
+    pushd $onnxruntime_dir
+    wget -c https://${SHERPA_ONNX_GITHUB}/microsoft/onnxruntime/releases/download/v${onnxruntime_version}/onnxruntime-ios-static-xcframework-${onnxruntime_version}.zip
+    unzip -o onnxruntime-ios-static-xcframework-${onnxruntime_version}.zip
+    rm onnxruntime-ios-static-xcframework-${onnxruntime_version}.zip
+    popd
+  fi
+  cd ios-onnxruntime
+  ln -sfn $onnxruntime_version/onnxruntime.xcframework onnxruntime.xcframework
   cd ..
-  ln -sf $onnxruntime_version/onnxruntime.xcframework .
-  popd
 fi
+
+# Create compat dirs so CMake can find libonnxruntime.a and Headers at flat paths.
+# CMake looks for $SHERPA_ONNXRUNTIME_LIB_DIR/libonnxruntime.a on Apple static builds.
+mkdir -p ios-onnxruntime/compat-device ios-onnxruntime/compat-sim
+XCF="$PWD/ios-onnxruntime/$onnxruntime_version/onnxruntime.xcframework"
+ln -sfn "$XCF/ios-arm64/onnxruntime.framework/onnxruntime"              ios-onnxruntime/compat-device/libonnxruntime.a
+ln -sfn "$XCF/ios-arm64/onnxruntime.framework/Headers"                  ios-onnxruntime/compat-device/Headers
+ln -sfn "$XCF/ios-arm64_x86_64-simulator/onnxruntime.framework/onnxruntime" ios-onnxruntime/compat-sim/libonnxruntime.a
+ln -sfn "$XCF/ios-arm64_x86_64-simulator/onnxruntime.framework/Headers"     ios-onnxruntime/compat-sim/Headers
 
 # First, for simulator
 echo "Building for simulator (x86_64)"
 
-export SHERPA_ONNXRUNTIME_LIB_DIR=$PWD/ios-onnxruntime/onnxruntime.xcframework/ios-arm64_x86_64-simulator
-export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$PWD/ios-onnxruntime/onnxruntime.xcframework/Headers
+export SHERPA_ONNXRUNTIME_LIB_DIR=$PWD/ios-onnxruntime/compat-sim
+export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$PWD/ios-onnxruntime/compat-sim/Headers
 
 echo "SHERPA_ONNXRUNTIME_LIB_DIR: $SHERPA_ONNXRUNTIME_LIB_DIR"
 echo "SHERPA_ONNXRUNTIME_INCLUDE_DIR $SHERPA_ONNXRUNTIME_INCLUDE_DIR"
@@ -127,7 +147,8 @@ cmake --build build/simulator_arm64 -j 4
 
 echo "Building for arm64"
 
-export SHERPA_ONNXRUNTIME_LIB_DIR=$PWD/ios-onnxruntime/onnxruntime.xcframework/ios-arm64
+export SHERPA_ONNXRUNTIME_LIB_DIR=$PWD/ios-onnxruntime/compat-device
+export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$PWD/ios-onnxruntime/compat-device/Headers
 
 cmake \
   -DBUILD_PIPER_PHONMIZE_EXE=OFF \

@@ -8,17 +8,33 @@ dir=build-maccatalyst
 mkdir -p $dir
 cd $dir
 
-# Verify onnxruntime is available (downloaded by build-ios.sh)
-if [ ! -d "../build-ios/ios-onnxruntime/onnxruntime.xcframework" ]; then
-    echo "Error: onnxruntime.xcframework not found."
-    echo "Please run build-ios.sh first to download onnxruntime."
-    exit 1
+# Mac Catalyst links against macOS libraries, so it needs a macOS-compatible ONNX Runtime.
+# The iOS xcframework (v1.25.1) only covers ios + ios-simulator; no macOS slice.
+# We download the same universal2 static ORT that sherpa-onnx's CMake uses for native macOS.
+MACOS_ORT_VERSION=1.24.4
+MACOS_ORT_ZIP="onnxruntime-osx-universal2-static_lib-${MACOS_ORT_VERSION}.zip"
+MACOS_ORT_URL="https://github.com/csukuangfj/onnxruntime-libs/releases/download/v${MACOS_ORT_VERSION}/${MACOS_ORT_ZIP}"
+# The zip extracts into a versioned subdirectory: onnxruntime-osx-universal2-static_lib-X.Y.Z/
+MACOS_ORT_EXTRACT_BASE="$PWD/macos-onnxruntime/${MACOS_ORT_VERSION}"
+MACOS_ORT_DIR="${MACOS_ORT_EXTRACT_BASE}/onnxruntime-osx-universal2-static_lib-${MACOS_ORT_VERSION}"
+
+if [ ! -f "${MACOS_ORT_DIR}/lib/libonnxruntime.a" ]; then
+    mkdir -p "${MACOS_ORT_EXTRACT_BASE}"
+    # Check ~/Downloads first to avoid re-downloading
+    LOCAL="$HOME/Downloads/${MACOS_ORT_ZIP}"
+    if [ -f "$LOCAL" ]; then
+        echo "Extracting macOS onnxruntime from $LOCAL"
+        unzip -o "$LOCAL" -d "${MACOS_ORT_EXTRACT_BASE}"
+    else
+        echo "Downloading macOS onnxruntime ${MACOS_ORT_VERSION}..."
+        curl -fL "${MACOS_ORT_URL}" -o "/tmp/${MACOS_ORT_ZIP}"
+        unzip -o "/tmp/${MACOS_ORT_ZIP}" -d "${MACOS_ORT_EXTRACT_BASE}"
+        rm "/tmp/${MACOS_ORT_ZIP}"
+    fi
 fi
 
-# Use macOS slice of onnxruntime for Mac Catalyst
-# Mac Catalyst links against macOS libraries
-export SHERPA_ONNXRUNTIME_LIB_DIR=$PWD/../build-ios/ios-onnxruntime/onnxruntime.xcframework/macos-arm64_x86_64
-export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$PWD/../build-ios/ios-onnxruntime/onnxruntime.xcframework/Headers
+export SHERPA_ONNXRUNTIME_LIB_DIR="${MACOS_ORT_DIR}/lib"
+export SHERPA_ONNXRUNTIME_INCLUDE_DIR="${MACOS_ORT_DIR}/include"
 
 echo "SHERPA_ONNXRUNTIME_LIB_DIR: $SHERPA_ONNXRUNTIME_LIB_DIR"
 echo "SHERPA_ONNXRUNTIME_INCLUDE_DIR: $SHERPA_ONNXRUNTIME_INCLUDE_DIR"
