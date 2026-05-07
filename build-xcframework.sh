@@ -402,6 +402,94 @@ create_unified_xcframework() {
   fi
 }
 
+# Add macOS slice to the onnxruntime xcframework so the macOS app target can link it.
+# The iOS slices are static frameworks (.framework bundles containing ar archives).
+# The macOS cmake build produces libonnxruntime.a — wrap it in a .framework so the
+# xcframework type is consistent (all framework, not mixed framework + static library).
+add_macos_onnxruntime_slice() {
+  log_step "Adding macOS slice to onnxruntime xcframework..."
+
+  local onnxruntime_xcfw="build-ios/ios-onnxruntime/1.25.1/onnxruntime.xcframework"
+  local macos_lib="build-swift-macos/install/lib/libonnxruntime.a"
+  local macos_slice="$onnxruntime_xcfw/macos-arm64_x86_64"
+  local macos_fw="$macos_slice/onnxruntime.framework"
+  local plist="$onnxruntime_xcfw/Info.plist"
+
+  if [ ! -f "$macos_lib" ]; then
+    warn "macOS onnxruntime not found at $macos_lib — skipping (macOS build not available)"
+    return 0
+  fi
+
+  if [ ! -d "$onnxruntime_xcfw" ]; then
+    warn "onnxruntime xcframework not found at $onnxruntime_xcfw — skipping"
+    return 0
+  fi
+
+  if [ -d "$macos_slice" ]; then
+    log "macOS onnxruntime slice already present — removing to refresh"
+    rm -rf "$macos_slice"
+    # Remove stale plist entry if present
+    local idx=0
+    local count=$(/usr/libexec/PlistBuddy -c "Print :AvailableLibraries" "$plist" | grep -c "Dict" || echo 0)
+    while [ $idx -lt "$count" ]; do
+      local platform
+      platform=$(/usr/libexec/PlistBuddy -c "Print :AvailableLibraries:$idx:SupportedPlatform" "$plist" 2>/dev/null || echo "")
+      if [ "$platform" = "macos" ]; then
+        /usr/libexec/PlistBuddy -c "Delete :AvailableLibraries:$idx" "$plist"
+        break
+      fi
+      idx=$((idx + 1))
+    done
+  fi
+
+  # macOS frameworks require a versioned "deep bundle" (Versions/A/) unlike iOS's flat layout.
+  mkdir -p "$macos_fw/Versions/A/Resources"
+  cp "$macos_lib" "$macos_fw/Versions/A/onnxruntime"
+
+  cat > "$macos_fw/Versions/A/Resources/Info.plist" << 'FWPLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>onnxruntime</string>
+    <key>CFBundleName</key>
+    <string>onnxruntime</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.microsoft.onnxruntime</string>
+    <key>CFBundleVersion</key>
+    <string>1.24.4</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.24.4</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundlePackageType</key>
+    <string>FMWK</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+</dict>
+</plist>
+FWPLIST
+
+  ln -s A "$macos_fw/Versions/Current"
+  ln -s "Versions/Current/onnxruntime" "$macos_fw/onnxruntime"
+  ln -s "Versions/Current/Resources" "$macos_fw/Resources"
+
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries: dict" "$plist" 2>/dev/null || true
+  local last_index
+  last_index=$(/usr/libexec/PlistBuddy -c "Print :AvailableLibraries" "$plist" | grep -c "Dict" || echo 0)
+  last_index=$((last_index - 1))
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:LibraryIdentifier string macos-arm64_x86_64" "$plist"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:LibraryPath string onnxruntime.framework" "$plist"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:BinaryPath string onnxruntime.framework/onnxruntime" "$plist"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:SupportedArchitectures array" "$plist"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:SupportedArchitectures:0 string arm64" "$plist"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:SupportedArchitectures:1 string x86_64" "$plist"
+  /usr/libexec/PlistBuddy -c "Add :AvailableLibraries:$last_index:SupportedPlatform string macos" "$plist"
+
+  success "macOS onnxruntime slice added ($(du -sh "$macos_fw/Versions/A/onnxruntime" | awk '{print $1}'))"
+}
+
 # Verify the created xcframework
 verify_xcframework() {
   log_step "Verifying unified xcframework..."
@@ -527,6 +615,10 @@ main() {
 
   # Step 6: Create unified xcframework
   create_unified_xcframework
+  echo ""
+
+  # Step 6.5: Add macOS slice to onnxruntime xcframework
+  add_macos_onnxruntime_slice
   echo ""
 
   # Step 7: Verify the result
