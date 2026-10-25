@@ -16,7 +16,9 @@ self.Module = {
       self.postMessage({
         type: "sherpa-onnx-tts-ready",
         modelType: getDefaultOfflineTtsModelType(),
+        usePhonemize: getDefaultUsePhonemize(),
         numSpeakers: tts.numSpeakers,
+        lang: tts.lang,
       });
     } catch (e) {
       self.postMessage({
@@ -42,7 +44,7 @@ function getErrorMessage(err) {
 
 self.onmessage = async (e) => {
   const { type, text, sid, speed, genConfig } = e.data;
-  if (type === "generate") {
+  if (type == "generate") {
     if (!tts) {
       return;
     }
@@ -68,7 +70,30 @@ self.onmessage = async (e) => {
         message: "Generation failed: " + getErrorMessage(err),
       });
     }
-  } else if (type === "generateWithConfig") {
+  } else if (type == "setFrontend") {
+    if (!self.Module) {
+      return;
+    }
+    setUsePhonemize(!!e.data.usePhonemize);
+    if (tts && tts.free) {
+      tts.free();
+    }
+    try {
+      tts = createOfflineTts(self.Module);
+      self.postMessage({
+        type: "sherpa-onnx-tts-ready",
+        modelType: getDefaultOfflineTtsModelType(),
+        usePhonemize: getDefaultUsePhonemize(),
+        numSpeakers: tts.numSpeakers,
+        lang: tts.lang,
+      });
+    } catch (err) {
+      self.postMessage({
+        type: "error",
+        message: "TTS Initialization failed: " + getErrorMessage(err),
+      });
+    }
+  } else if (type == "generateWithConfig") {
     if (!tts) {
       return;
     }

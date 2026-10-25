@@ -31,7 +31,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest] #, macos-latest] #, windows-2022]
-        python-version: ["3.8"]
+        python-version: ["3.10"]
 
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
       - name: Install emsdk
         uses: mymindstorm/setup-emsdk@v14
         with:
-          version: 3.1.51
+          version: 4.0.23
           actions-cache-folder: 'emsdk-cache'
 
       - name: View emsdk version
@@ -113,6 +113,20 @@ jobs:
           pushd $d
           npm install
           npm install wav
+          npm install piper-phonemize
           popd
 
           ./.github/scripts/test-nodejs-npm.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tts-waves-${{ matrix.os }}-${{ matrix.node-version }}
+          # The examples are copied into scripts/nodejs and run from there
+          # (export d=scripts/nodejs), so their wavs land in scripts/nodejs,
+          # not in nodejs-examples.
+          path: scripts/nodejs/test-*.wav
+          if-no-files-found: warn
+
+      - name: Setup tmate session
+        if: false
+        # if: failure()
+        uses: mxschmitt/action-tmate@v3

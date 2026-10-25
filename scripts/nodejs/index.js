@@ -1,7 +1,12 @@
 // Copyright (c)  2023-2024  Xiaomi Corporation (authors: Fangjun Kuang)
 'use strict'
 
-const wasmModule = require('./sherpa-onnx-wasm-nodejs.js')();
+// Emscripten >= 3.1.50 made MODULARIZE always return a Promise, even with
+// WASM_ASYNC_COMPILATION=0. The runtime still attaches the exports onto the
+// user-supplied moduleArg synchronously, so we pass our own object and ignore
+// the (already-resolved) Promise — keeping this whole module synchronous.
+const wasmModule = {};
+require('./sherpa-onnx-wasm-nodejs.js')(wasmModule);
 const sherpa_onnx_asr = require('./sherpa-onnx-asr.js');
 const sherpa_onnx_tts = require('./sherpa-onnx-tts.js');
 const sherpa_onnx_kws = require('./sherpa-onnx-kws.js');
@@ -89,6 +94,12 @@ function getGitDate() {
   return wasmModule.UTF8ToString(v);
 }
 
+// Return the onnxruntime version string used by the library.
+function getOnnxruntimeVersion() {
+  const v = wasmModule._SherpaOnnxGetOnnxruntimeVersionStr();
+  return wasmModule.UTF8ToString(v);
+}
+
 // Note: online means streaming and offline means non-streaming here.
 // Both of them don't require internet connection.
 module.exports = {
@@ -106,7 +117,8 @@ module.exports = {
   createOfflineSpeakerDiarization,
   createOfflineSpeechDenoiser,
   createOnlineSpeechDenoiser,
-  version: getVersion(),
-  gitSha1: getGitSha1(),
-  gitDate: getGitDate(),
+  version : getVersion(),
+  gitSha1 : getGitSha1(),
+  gitDate : getGitDate(),
+  onnxruntimeVersion : getOnnxruntimeVersion(),
 };

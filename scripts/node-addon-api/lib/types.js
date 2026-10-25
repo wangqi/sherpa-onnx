@@ -56,6 +56,56 @@
  */
 
 /**
+ * @typedef {Object} LinearResamplerHandle
+ * @see src/resampler.cc
+ */
+
+/**
+ * @typedef {Object} OfflineTtsHandle
+ * @see src/non-streaming-tts.cc
+ */
+
+/**
+ * @typedef {Object} OnlinePunctuationHandle
+ * @see src/punctuation.cc
+ */
+
+/**
+ * @typedef {Object} KeywordSpotterHandle
+ * @see src/keyword-spotter.cc
+ */
+
+/**
+ * @typedef {Object} SpeakerEmbeddingExtractorHandle
+ * @see src/speaker-identification.cc
+ */
+
+/**
+ * @typedef {Object} SpeakerEmbeddingManagerHandle
+ * @see src/speaker-identification.cc
+ */
+
+/**
+ * @typedef {Object} SpokenLanguageIdentificationHandle
+ * @see src/spoken-language-identification.cc
+ */
+
+/**
+ * @typedef {Object} OfflineSpeakerDiarizationHandle
+ * @see src/non-streaming-speaker-diarization.cc
+ */
+
+/**
+ * @typedef {Object} OfflineSpeechDenoiserHandle
+ * @see src/non-streaming-speech-denoiser.cc
+ */
+
+/**
+ * @typedef {Object} OnlineSpeechDenoiserHandle
+ * @see src/online-speech-denoiser.cc
+ */
+
+/**
  * A single audio event returned by AudioTagging.compute().
  * @typedef {Object} AudioEvent
  * @property {string} name - The event name.
@@ -258,9 +308,9 @@
  * @property {OfflineCanaryModelConfig} [canary]
  * @property {OfflineWhisperModelConfig} [whisper]
  * @property {OfflineFireRedAsrModelConfig} [fireRedAsr]
-  * @property {OfflineMoonshineModelConfig} [moonshine]
-  * @property {OfflineTdnnModelConfig} [tdnn]
-  * @property {OfflineSenseVoiceModelConfig} [senseVoice]
+ * @property {OfflineMoonshineModelConfig} [moonshine]
+ * @property {OfflineTdnnModelConfig} [tdnn]
+ * @property {OfflineSenseVoiceModelConfig} [senseVoice]
  * @property {OfflineCohereTranscribeModelConfig} [cohereTranscribe]
  * @property {string} [tokens]
  * @property {number} [numThreads]
@@ -347,10 +397,18 @@
  */
 
 /**
+ * CTC FST decoder options for offline CTC models.
+ * @typedef {Object} OfflineCtcFstDecoderConfig
+ * @property {string} [graph] - Path to the decoding graph.
+ * @property {number} [maxActive] - Decoder max-active setting. 0 means 3000.
+ */
+
+/**
  * Offline recognizer config passed to createOfflineRecognizer.
  * @typedef {Object} OfflineRecognizerConfig
  * @property {FeatureConfig} [featConfig]
  * @property {OfflineModelConfig} [modelConfig]
+ * @property {OfflineCtcFstDecoderConfig} [ctcFstDecoderConfig]
  */
 
 /**
@@ -364,7 +422,7 @@
 /**
  * Speech segment returned by Vad.front().
  * @typedef {Object} SpeechSegment
- * @property {number} start - Start index (int32) of this segment.
+ * @property {number} start - Start index (int64 sample position) of this segment.
  * @property {Float32Array} samples - Float32Array of samples.
  * @see src/vad.cc
  */
@@ -390,6 +448,14 @@
  * @property {string=} referenceText
  *
  * @property {{[key: string]: number | string}} [extra]
+ *
+ * @property {number[][]} [phonemeCodepoints] - Pre-phonemized input as
+ *           Unicode codepoints, one inner array per sentence. When set, it is
+ *           used in place of the text argument. Mutually exclusive with
+ *           `tokens`.
+ * @property {string[][]} [tokens] - Pre-tokenized input, e.g. Chinese pinyin
+ *           like "zhong1", one inner array per sentence. Mutually exclusive
+ *           with `phonemeCodepoints`.
  */
 
 
@@ -475,7 +541,8 @@
  * @property {string} [model]
  * @property {string} [lexicon]
  * @property {string} [tokens]
- * @property {string} [dataDir]
+ * @property {string} [dataDir] - Deprecated. Ignored. Use lexicon, or
+ *           phonemeCodepoints or tokens instead.
  * @property {number} [noiseScale]
  * @property {number} [noiseScaleW]
  * @property {number} [lengthScale]
@@ -487,7 +554,8 @@
  * @property {string} [vocoder]
  * @property {string} [lexicon]
  * @property {string} [tokens]
- * @property {string} [dataDir]
+ * @property {string} [dataDir] - Deprecated. Ignored. Use lexicon, or
+ *           phonemeCodepoints or tokens instead.
  * @property {number} [noiseScale]
  * @property {number} [lengthScale]
  */
@@ -497,7 +565,8 @@
  * @property {string} [model]
  * @property {string} [voices]
  * @property {string} [tokens]
- * @property {string} [dataDir]
+ * @property {string} [dataDir] - Deprecated. Ignored. Use lexicon, or
+ *           phonemeCodepoints or tokens instead.
  * @property {number} [lengthScale]
  * @property {string} [lexicon]
  * @property {string} [lang]
@@ -508,7 +577,9 @@
  * @property {string} [model]
  * @property {string} [voices]
  * @property {string} [tokens]
- * @property {string} [dataDir]
+ * @property {string} [lexicon]
+ * @property {string} [dataDir] - Deprecated. Ignored. Use lexicon, or
+ *           phonemeCodepoints or tokens instead.
  * @property {number} [lengthScale]
  */
 
@@ -518,7 +589,8 @@
  * @property {string} [encoder]
  * @property {string} [decoder]
  * @property {string} [vocoder]
- * @property {string} [dataDir]
+ * @property {string} [dataDir] - Deprecated. Ignored. Use lexicon, or
+ *           phonemeCodepoints or tokens instead.
  * @property {string} [lexicon]
  * @property {number} [featScale]
  * @property {number} [tShift]
@@ -569,6 +641,7 @@
  * Offline Speech Denoiser model config
  * @typedef {Object} OfflineSpeechDenoiserDpdfNetModelConfig
  * @property {string} [model]
+ * @property {number} [attenuationLimitDb] Offline attenuation limit in dB.
  */
 
 /**
@@ -597,6 +670,7 @@
  * Offline speaker segmentation (pyannote) model config
  * @typedef {Object} OfflineSpeakerSegmentationPyannoteModelConfig
  * @property {string} [model]
+ * @property {number} [windowShiftRatio=0.1]
  */
 
 /**
@@ -687,6 +761,7 @@
  * @property {number[]} context_scores
  * @property {number} segment
  * @property {number[]} words
+ * @property {number} num_trailing_blanks
  * @property {number} start_time
  * @property {boolean} is_final
  * @property {boolean} is_eof

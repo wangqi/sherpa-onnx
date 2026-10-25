@@ -1,3 +1,9 @@
+<div align="center">
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/k2-fsa/sherpa-onnx)
+
+</div>
+
  ### Supported functions
 
 |Speech recognition| [Speech synthesis][tts-url] | [Source separation][ss-url] |
@@ -44,15 +50,46 @@
 
 It also supports WebAssembly.
 
+### Supported frameworks
+
+#### [Flutter][flutter-url]
+
+|Architecture| Android | iOS     | Windows | macOS | Linux | Web |
+|------------|---------|---------|---------|-------|-------|-----|
+|   x64      |  ✔️      |         |  ✔️     | ✔️    |  ✔️    |  ✔️  |
+|   x86      |  ✔️      |         |         |       |       |  ✔️  |
+|   arm64    |  ✔️      |  ✔️     |  ✔️     | ✔️    |  ✔️    |  ✔️  |
+|   arm32    |  ✔️      |         |         |       |       |  ✔️  |
+
+- Pre-built Flutter demo apps: [flutter releases][flutter-releases]
+
+#### [Tauri][tauri-url]
+
+|Architecture| Android | iOS     | Windows | macOS | Linux |
+|------------|---------|---------|---------|-------|-------|
+|   x64      |  ✔️      |         |  ✔️     | ✔️    |  ✔️    |
+|   x86      |  ✔️      |         |         |       |       |
+|   arm64    |  ✔️      |  ✔️     |  ✔️     | ✔️    |  ✔️    |
+|   arm32    |  ✔️      |         |         |       |       |
+
+- Pre-built Tauri demo apps: [tauri releases][tauri-releases]
+
+[flutter-url]: https://flutter.dev
+[tauri-url]: https://v2.tauri.app
+[flutter-releases]: https://github.com/k2-fsa/sherpa-onnx/releases/tag/flutter
+[tauri-releases]: https://github.com/k2-fsa/sherpa-onnx/releases/tag/tauri
+
 ### Supported NPUs
 
 | [1. Rockchip NPU (RKNN)][rknpu-doc] | [2. Qualcomm NPU (QNN)][qnn-doc]  | [3. Ascend NPU][ascend-doc] |
 |-------------------------------------|-----------------------------------|-----------------------------|
 |     ✔️                              |                  ✔️               |     ✔️                      |
 
-| [4. Axera NPU][axera-npu] |
-|---------------------------|
-|     ✔️                    |
+| [4. Axera NPU][axera-npu] | [5. Intel NPU (OpenVINO)][openvino-npu] |
+|---------------------------|------------------------------------------|
+|     ✔️                    |                    ✔️                    |
+
+[openvino-npu]: OPENVINO.md
 
 [Join our discord](https://discord.gg/fJdxzg2VbG)
 
@@ -300,6 +337,24 @@ for 新一代 Kaldi **微信交流群** and **QQ 交流群**.
 
 ## Projects using sherpa-onnx
 
+### [VocaRead](https://apps.apple.com/us/app/vocaread/id6757822401)
+
+> iOS app for reading EPUBs, PDFs, and documents aloud. It uses sherpa-onnx
+> to synthesize speech locally with Piper voices and can import books from OPDS catalogs.
+
+### [Sherpa Voice / @siteed/sherpa-onnx.rn](https://github.com/deeeed/audiolab)
+
+> React Native wrapper and demo app for validating sherpa-onnx on iOS,
+> Android, and Web, including ASR, TTS, VAD, KWS, speaker ID, diarization,
+> language ID, punctuation, audio tagging, and speech enhancement.
+
+- [NPM package](https://www.npmjs.com/package/@siteed/sherpa-onnx.rn)
+- [Live demo](https://deeeed.github.io/audiolab/sherpa-voice/)
+
+### [SmartVoice](https://github.com/dxhome/SmartVoice)
+
+> SmartVoice is a local speech application for speech recognition and text-to-speech. Its `smartvoice-auto` virtual model matches each request's task and language against an editable routing table, then dynamically routes it to the most suitable installed model. sherpa-onnx powers CPU inference; a web interface and HTTP API are included.
+
 ### [Speed of Sound](https://github.com/zugaldia/speedofsound)
 
 > A voice-typing application for the Linux desktop (GTK4/Adwaita).
@@ -313,7 +368,7 @@ for 新一代 Kaldi **微信交流群** and **QQ 交流群**.
 > It supports Kokoro-82M, Piper, and VITS engines with multilingual support including
 > Hindi, English, British English, Japanese, Chinese and 50+ more languages.
 
-- [Download APK v1.0-beta](https://huggingface.co/CodeBySonu95/Sherpa-onnx-models/resolve/main/VoxSherpa-TTS_test.apk)
+- [Download APK (All Versions)](https://github.com/CodeBySonu95/VoxSherpa-TTS/releases)
 - Android 11+ · 100% offline · No telemetry
 
 <div align="center">
@@ -473,8 +528,143 @@ cross-platform Node.js microphone streaming library with prebuilt native binarie
 
 - [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=analytics-in-motion.wake-word)
 - [Open VSX](https://open-vsx.org/extension/analytics-in-motion/wake-word)
-- [decibri integration guides for sherpa-onnx](https://decibri.dev/docs/node/integrations/sherpa-onnx-stt.html)
+- [decibri integration guides for sherpa-onnx](https://decibri.dev/docs/integrations/stt/sherpa-onnx)
 
+### [SmartSub](https://github.com/buxuku/SmartSub)
+
+> SmartSub is a local-first cross-platform desktop application for the complete subtitle production pipeline: audio/video transcription, subtitle translation, proofreading, and subtitle burning/muxing.
+>
+> It natively integrates sherpa-onnx to power three offline ASR engines — FunASR, Qwen3-ASR, and FireRedASR — delivering high-accuracy Chinese and multilingual speech recognition entirely on-device, with no file uploads required.
+
+### [Fono](https://github.com/bogdanr/fono)
+
+> Talk to your computer. Fono is an open-source (GPL-3.0), complete voice-AI
+> stack (speech-to-text, text-to-speech, a local LLM, wake word, speaker ID) in
+> one small binary for the Linux, macOS, and Windows desktop. Press a key and
+> speak: it types into any app, answers as a voice assistant, or drives a coding
+> agent.
+
+It uses sherpa-onnx's Supertonic TTS models for text-to-speech, with the
+Supertonic text frontend ported to Rust. See also
+[#3750](https://github.com/k2-fsa/sherpa-onnx/pull/3750), which fixes dropped
+diacritics in the Supertonic frontend for Romanian, Czech, Polish, Hungarian,
+Turkish, Vietnamese, and other non-English Latin-script languages.
+
+### [Domia](https://github.com/domia-ai/domia-core)
+
+> Domia is an open-source local AI companion you talk to, living entirely on
+> hardware you own. Each Domia is its own character, with a distinct
+> personality, voice, emotional state, and memory of you and its place — and it
+> acts, not just talks: skills connect it to the real world over MCP, Home
+> Assistant included. Domia nodes form a local peer-to-peer mesh that shares
+> speech and reasoning compute, while room satellites bring each companion into
+> the spaces where you live without giving up its identity. No cloud, no
+> accounts, and no data leaving your network.
+
+Domia runs sherpa-onnx in-process for keyword spotting, voice activity
+detection, streaming and offline speech recognition, and text-to-speech.
+Speech engines and models are selected through per-companion configuration,
+making it easy to match supported sherpa-onnx models to different hardware.
+
+### [qwen-audio-agent](https://github.com/QwenAudio/qwen-audio-agent)
+
+> A realtime full-duplex voice runtime for AI coding agents
+> (Claude Code, Codex, OpenCode, and other ACP agents).
+> It uses sherpa-onnx keyword spotting with the 3M-parameter
+> zh-en transducer model to implement a local voice wake word:
+> the app sleeps on idle but keeps the microphone open,
+> and the wake phrase brings the session back with no cloud calls.
+
+### [Suflyor](https://github.com/olerast67/voice-teleprompter-android)
+
+> An Android teleprompter that scrolls the script as you read it aloud. It runs
+> two streaming Zipformer models on the phone (Russian small-ru-vosk int8 and
+> English en-2023-06-26) and boosts the words of the script as hotwords with
+> modified beam search. A floating window shows the text over the camera app
+> while it records video.
+
+- [Download APK](https://github.com/olerast67/voice-teleprompter-android/releases/latest)
+- [Website](https://olerast67.github.io/voice-teleprompter-android/)
+- Android 10+ · no internet permission · GPL-3.0
+
+### [Loud Caption](https://github.com/DR1N0/loud-caption)
+
+> An open-source Flutter app for Android that turns nearby speech into large,
+> high-contrast captions for people with hearing loss. SenseVoice ASR and Silero
+> VAD run fully on-device through sherpa-onnx's Dart API; translation is
+> optional and also local. No account, analytics, or cloud audio.
+
+- [Download APK](https://github.com/DR1N0/loud-caption/releases/latest)
+- Android 8.0+ · arm64-v8a · MIT (app code)
+
+### [Recly](https://github.com/rokrokss/recly)
+
+> An open-source recorder for Galaxy Watch, Android, Apple Watch, iPhone, macOS,
+> and Windows. Recordings go to the user's own Google Drive; there is no Recly
+> server. The Android phone app (which also transcribes Galaxy Watch recordings)
+> and the Windows app use sherpa-onnx for on-device transcription: Silero VAD
+> splits each recording into speech segments, and sherpa-onnx's INT8 export of
+> Qwen3-ASR 0.6B transcribes them. The ~1 GB model is downloaded on demand.
+
+### China Unicom 中国联通安卓 App
+
+> The Android App (version `>= 12.14.1 (2026.07.28)`) uses `sherpa-onnx` Kotlin API for keyword spotting.
+
+<img width="800" alt="APK lib screenshot showing only armeabi-v7a" src="https://github.com/user-attachments/assets/a9ce9731-1ec7-4975-a62e-2dd44b8f3bfe" />
+
+### China Life 中国人寿 App
+
+> The Android App (version `>= 3.5.46 (2026.03.23)`) uses `sherpa-onnx` Kotlin API for keyword spotting.
+
+<img width="800" alt="APK lib screenshot" src="https://github.com/user-attachments/assets/0d9d8021-f908-4659-993f-95b5c789d5c6" />
+
+### [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
+
+> It [uses](https://github.com/deepseek-ai/deepseek-harness/commit/47ae64ee68b416cc0aa78891892ae9e9be6590c5)
+> the JavaScript npm package [sherpa-onnx-node][sherpa-onnx-node] with [SenseVoice](https://k2-fsa.github.io/sherpa/onnx/sense-voice/pretrained.html#sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17-int8-chinese-english-japanese-korean-cantonese)
+for local speech recognition.
+
+### [akou](https://github.com/GeiserX/akou)
+
+> An open-source (GPL-3.0-or-later) call and meeting recorder for macOS that transcribes
+> on the machine. It records the microphone and the call audio on two channels,
+> shows a live transcript, and lets a terminal agent such as Claude Code or Codex
+> follow and question the call over MCP. The same core runs as a self-hosted
+> transcription server in Docker.
+
+It runs [sherpa-onnx-node][sherpa-onnx-node] in a Bun Worker: [silero-vad][silero-vad]
+splits each channel into speech segments, Parakeet TDT 0.6B v3 (`OfflineRecognizer`)
+or streaming Nemotron (`OnlineRecognizer`) writes the live transcript, and TitaNet
+embeddings (`SpeakerEmbeddingExtractor`) help tell the speakers on the call apart.
+After the call, Parakeet is the fast engine of the final pass and one of the
+engines of the fused pass. The larger Qwen3-ASR model runs outside sherpa-onnx, on
+llama-server.
+
+### [bot-reborn](https://github.com/beasaltfish/bot-reborn)
+
+> A $4 toy robot driven by an old Android phone, all from one web page in Chrome.
+> sherpa-onnx runs in the page as WebAssembly: Silero VAD decides when someone is
+> actually talking, so only real speech is sent to STT, and an optional keyword
+> spotter (`sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20`) handles the wake word.
+> Both run from one combined build, with the VAD symbols exported from the KWS
+> WebAssembly target.
+
+- [Build write-up](https://agentlenshq.com/maker/four-dollar-robot)
+- [Live page](https://bot-reborn.agentlenshq.com) (Chrome on Android)
+
+### [Voltip](https://github.com/sunerpy/voltip)
+
+> An open-source (AGPL-3.0) push-to-talk dictation app for Windows, macOS, Linux
+> and Android: hold a hotkey, speak, and the text is inserted at the cursor in
+> the focused app. The desktop app uses the sherpa-onnx Rust crate for on-device
+> recognition with SenseVoice and Paraformer, a streaming Zipformer for the live
+> preview while the user speaks, and Silero VAD to trim silence and to split
+> recordings of up to two hours at pauses. Models are downloaded on demand.
+
+- [Website](https://voltip.firlab.app)
+- [Releases](https://github.com/sunerpy/voltip/releases)
+
+[sherpa-onnx-node]: https://www.npmjs.com/package/sherpa-onnx-node
 [silero-vad]: https://github.com/snakers4/silero-vad
 [Raspberry Pi]: https://www.raspberrypi.com/
 [RV1126]: https://www.rock-chips.com/uploads/pdf/2022.8.26/191/RV1126%20Brief%20Datasheet.pdf

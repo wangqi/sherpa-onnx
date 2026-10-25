@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+
 #if __ANDROID_API__ >= 9
 
 #include "android/asset_manager.h"
@@ -66,8 +67,13 @@
 
 #if SHERPA_ONNX_ENABLE_QNN
 #include "sherpa-onnx/csrc/qnn/offline-paraformer-model-qnn.h"
+#include "sherpa-onnx/csrc/qnn/offline-recognizer-parakeet-ctc-qnn-impl.h"
+#include "sherpa-onnx/csrc/qnn/offline-recognizer-parakeet-tdt-qnn-impl.h"
+#include "sherpa-onnx/csrc/qnn/offline-recognizer-transducer-qnn-impl.h"
 #include "sherpa-onnx/csrc/qnn/offline-recognizer-zipformer-ctc-qnn-impl.h"
 #include "sherpa-onnx/csrc/qnn/offline-sense-voice-model-qnn.h"
+#include "sherpa-onnx/csrc/qnn/offline-whisper-model-qnn.h"
+#include "sherpa-onnx/csrc/qnn/offline-recognizer-moonshine-qnn-impl.h"
 #endif
 
 namespace sherpa_onnx {
@@ -187,6 +193,11 @@ std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
       return std::make_unique<
           OfflineRecognizerSenseVoiceTplImpl<OfflineSenseVoiceModelQnn>>(
           config);
+    } else if (IsQnnTransducerArtifact(config.model_config.transducer) &&
+               config.model_config.model_type == "nemo_transducer") {
+      return std::make_unique<OfflineRecognizerParakeetTdtQnnImpl>(config);
+    } else if (IsQnnTransducerArtifact(config.model_config.transducer)) {
+      return std::make_unique<OfflineRecognizerTransducerQnnImpl>(config);
     } else if (!config.model_config.zipformer_ctc.model.empty() ||
                !config.model_config.zipformer_ctc.qnn_config.context_binary
                     .empty()) {
@@ -197,10 +208,23 @@ std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
       return std::make_unique<
           OfflineRecognizerParaformerTplImpl<OfflineParaformerModelQnn>>(
           config);
+    } else if (!config.model_config.nemo_ctc.model.empty() ||
+               !config.model_config.nemo_ctc.qnn_config.context_binary
+                    .empty()) {
+      return std::make_unique<OfflineRecognizerParakeetCtcQnnImpl>(config);
+    } else if (!config.model_config.whisper.encoder.empty() ||
+               !config.model_config.whisper.qnn_config.context_binary.empty()) {
+      return std::make_unique<
+          OfflineRecognizerWhisperTplImpl<OfflineWhisperModelQnn>>(config);
+    } else if (!config.model_config.moonshine.encoder.empty() ||
+               !config.model_config.moonshine.decoder.empty() ||
+               !config.model_config.moonshine.qnn_config.context_binary.empty()) {
+      return std::make_unique<OfflineRecognizerMoonshineQnnImpl>(config);
     } else {
       SHERPA_ONNX_LOGE(
-          "Only SenseVoice, Paraformer, and Zipformer CTC models are currently "
-          "supported by QNN for non-streaming ASR.");
+          "Only SenseVoice, Paraformer, Zipformer transducer, Zipformer CTC, "
+          "NeMo CTC (Parakeet), Parakeet TDT, Whisper, and Moonshine models "
+          "are currently supported by QNN for non-streaming ASR.");
       SHERPA_ONNX_EXIT(-1);
       return nullptr;
     }
@@ -293,7 +317,7 @@ std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
     }
   }
 
-  Ort::Env env(ORT_LOGGING_LEVEL_ERROR);
+  Ort::Env env = ORT_LOGGING_LEVEL_ERROR;
 
   Ort::SessionOptions sess_opts;
   sess_opts.SetIntraOpNumThreads(1);
@@ -536,6 +560,13 @@ std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
       return std::make_unique<
           OfflineRecognizerSenseVoiceTplImpl<OfflineSenseVoiceModelQnn>>(
           mgr, config);
+    } else if (IsQnnTransducerArtifact(config.model_config.transducer)) {
+      SHERPA_ONNX_LOGE(
+          "QNN Zipformer transducer does not support loading from asset "
+          "manager. Please copy model files to writable storage and use file "
+          "paths.");
+      SHERPA_ONNX_EXIT(-1);
+      return nullptr;
     } else if (!config.model_config.zipformer_ctc.model.empty() ||
                !config.model_config.zipformer_ctc.qnn_config.context_binary
                     .empty()) {
@@ -547,10 +578,22 @@ std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
       return std::make_unique<
           OfflineRecognizerParaformerTplImpl<OfflineParaformerModelQnn>>(
           mgr, config);
+    } else if (!config.model_config.nemo_ctc.model.empty() ||
+               !config.model_config.nemo_ctc.qnn_config.context_binary
+                    .empty()) {
+      return std::make_unique<OfflineRecognizerParakeetCtcQnnImpl>(mgr, config);
+    } else if (!config.model_config.whisper.encoder.empty() ||
+               !config.model_config.whisper.qnn_config.context_binary.empty()) {
+      return std::make_unique<
+          OfflineRecognizerWhisperTplImpl<OfflineWhisperModelQnn>>(mgr, config);
+    } else if (!config.model_config.moonshine.encoder.empty() ||
+               !config.model_config.moonshine.qnn_config.context_binary.empty()) {
+      return std::make_unique<OfflineRecognizerMoonshineQnnImpl>(mgr, config);
     } else {
       SHERPA_ONNX_LOGE(
-          "Only SenseVoice, Paraformer, and Zipformer CTC models are currently "
-          "supported by QNN for non-streaming ASR.");
+          "Only SenseVoice, Paraformer, Zipformer transducer, Zipformer CTC, "
+          "NeMo CTC (Parakeet), Parakeet TDT, Whisper, and Moonshine models "
+          "are currently supported by QNN for non-streaming ASR.");
       SHERPA_ONNX_EXIT(-1);
       return nullptr;
     }
@@ -642,7 +685,7 @@ std::unique_ptr<OfflineRecognizerImpl> OfflineRecognizerImpl::Create(
     }
   }
 
-  Ort::Env env(ORT_LOGGING_LEVEL_ERROR);
+  Ort::Env env = ORT_LOGGING_LEVEL_ERROR;
 
   Ort::SessionOptions sess_opts;
   sess_opts.SetIntraOpNumThreads(1);

@@ -9,9 +9,10 @@ mkdir -p $dir
 cd $dir
 
 # Mac Catalyst links against macOS libraries, so it needs a macOS-compatible ONNX Runtime.
-# The iOS xcframework (v1.25.1) only covers ios + ios-simulator; no macOS slice.
+# The iOS xcframework only covers ios + ios-simulator; no macOS slice.
 # We download the same universal2 static ORT that sherpa-onnx's CMake uses for native macOS.
-MACOS_ORT_VERSION=1.24.4
+# v2.0.0: 1.28.2, matching build-ios.sh and cmake/onnxruntime-osx-universal-static.cmake. # wangqi modified 2026-10-24
+MACOS_ORT_VERSION=${SHERPA_ONNX_ONNXRUNTIME_VERSION:-1.28.2}
 MACOS_ORT_ZIP="onnxruntime-osx-universal2-static_lib-${MACOS_ORT_VERSION}.zip"
 MACOS_ORT_URL="https://github.com/csukuangfj/onnxruntime-libs/releases/download/v${MACOS_ORT_VERSION}/${MACOS_ORT_ZIP}"
 # The zip extracts into a versioned subdirectory: onnxruntime-osx-universal2-static_lib-X.Y.Z/
@@ -87,7 +88,7 @@ cmake --build build/catalyst_arm64 --target install
 echo "Combining architectures with lipo..."
 mkdir -p "build/catalyst/lib"
 
-# Library list matching build-ios.sh
+# Library list matching build-ios.sh (v2.0.0: no ucd / piper_phonemize / espeak-ng, add utf8proc) # wangqi modified 2026-10-24
 LIBS=(
   libkaldi-native-fbank-core.a
   libkissfft-float.a
@@ -98,9 +99,7 @@ LIBS=(
   libsherpa-onnx-fst.a
   libsherpa-onnx-kaldifst-core.a
   libkaldi-decoder-core.a
-  libucd.a
-  libpiper_phonemize.a
-  libespeak-ng.a
+  libutf8proc.a
 )
 
 for f in "${LIBS[@]}"; do
@@ -111,6 +110,7 @@ for f in "${LIBS[@]}"; do
     -output build/catalyst/lib/${f}
 done
 
+# v2.0.0 library set, same as LIBS above # wangqi modified 2026-10-24
 echo "Merging into single static library..."
 libtool -static -o build/catalyst/libsherpa-onnx.a \
   build/catalyst/lib/libkaldi-native-fbank-core.a \
@@ -121,10 +121,8 @@ libtool -static -o build/catalyst/libsherpa-onnx.a \
   build/catalyst/lib/libsherpa-onnx-fst.a \
   build/catalyst/lib/libsherpa-onnx-kaldifst-core.a \
   build/catalyst/lib/libkaldi-decoder-core.a \
-  build/catalyst/lib/libucd.a \
-  build/catalyst/lib/libpiper_phonemize.a \
-  build/catalyst/lib/libespeak-ng.a \
-  build/catalyst/lib/libssentencepiece_core.a
+  build/catalyst/lib/libssentencepiece_core.a \
+  build/catalyst/lib/libutf8proc.a
 
 echo "Creating xcframework for Mac Catalyst..."
 rm -rf sherpa-onnx.xcframework

@@ -409,7 +409,9 @@ create_unified_xcframework() {
 add_macos_onnxruntime_slice() {
   log_step "Adding macOS slice to onnxruntime xcframework..."
 
-  local onnxruntime_xcfw="build-ios/ios-onnxruntime/1.25.1/onnxruntime.xcframework"
+  # v2.0.0: iOS and macOS onnxruntime are both 1.28.2 (build-ios.sh, cmake/onnxruntime-osx-universal-static.cmake). # wangqi modified 2026-10-24
+  local ort_version="${SHERPA_ONNX_ONNXRUNTIME_VERSION:-1.28.2}"
+  local onnxruntime_xcfw="build-ios/ios-onnxruntime/${ort_version}/onnxruntime.xcframework"
   local macos_lib="build-swift-macos/install/lib/libonnxruntime.a"
   local macos_slice="$onnxruntime_xcfw/macos-arm64_x86_64"
   local macos_fw="$macos_slice/onnxruntime.framework"
@@ -458,9 +460,9 @@ add_macos_onnxruntime_slice() {
     <key>CFBundleIdentifier</key>
     <string>com.microsoft.onnxruntime</string>
     <key>CFBundleVersion</key>
-    <string>1.24.4</string>
+    <string>1.28.2</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.24.4</string>
+    <string>1.28.2</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundlePackageType</key>

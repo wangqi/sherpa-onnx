@@ -5,9 +5,13 @@ set -e
 dir=build-ios
 mkdir -p $dir
 cd $dir
-onnxruntime_version=1.25.1
+# Upstream v2.0.0 onnxruntime version (1.28.2) and download source; the fork keeps its pinned
+# SDK / compiler paths and the ~/Downloads local copy below.
+onnxruntime_version=${SHERPA_ONNX_ONNXRUNTIME_VERSION:-1.28.2}
 onnxruntime_dir=ios-onnxruntime/$onnxruntime_version
 
+# Pin the iOS SDKs and compilers explicitly so a non-default Xcode or a stray toolchain on PATH
+# cannot leak into the cross build. # wangqi modified 2026-10-24
 IOS_DEVICE_SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
 IOS_SIM_SDK_PATH=$(xcrun --sdk iphonesimulator --show-sdk-path)
 IOS_SIM_CLANG=$(xcrun --sdk iphonesimulator --find clang)
@@ -33,48 +37,32 @@ fi
 
 export LIBTOOL=$IOS_LIBTOOL
 
-SHERPA_ONNX_GITHUB=github.com
-
-if [ "$SHERPA_ONNX_GITHUB_MIRROW" == true ]; then
-    SHERPA_ONNX_GITHUB=hub.nuaa.cf
-fi
-
-# v1.25.1 uses .framework bundles inside the xcframework slices (not raw .a files).
-# Detection check: look for the framework binary in the device slice.
 if [ ! -f $onnxruntime_dir/onnxruntime.xcframework/ios-arm64/onnxruntime.framework/onnxruntime ]; then
   mkdir -p $onnxruntime_dir
-  # Prefer a pre-downloaded local copy in ~/Downloads (avoids re-downloading on clean builds).
+  # Prefer a pre-downloaded local copy in ~/Downloads (avoids re-downloading on clean builds). # wangqi modified 2026-10-24
   LOCAL_DOWNLOAD="$HOME/Downloads/onnxruntime-ios-static-xcframework-${onnxruntime_version}/onnxruntime.xcframework"
   if [ -d "$LOCAL_DOWNLOAD" ]; then
     echo "Copying onnxruntime xcframework from $LOCAL_DOWNLOAD"
     cp -r "$LOCAL_DOWNLOAD" "$onnxruntime_dir/onnxruntime.xcframework"
   else
-    # Fall back to official Microsoft GitHub release.
     pushd $onnxruntime_dir
-    wget -c https://${SHERPA_ONNX_GITHUB}/microsoft/onnxruntime/releases/download/v${onnxruntime_version}/onnxruntime-ios-static-xcframework-${onnxruntime_version}.zip
-    unzip -o onnxruntime-ios-static-xcframework-${onnxruntime_version}.zip
-    rm onnxruntime-ios-static-xcframework-${onnxruntime_version}.zip
+    wget -c https://github.com/csukuangfj/onnxruntime-libs/releases/download/v${onnxruntime_version}/onnxruntime-ios-static-xcframework-${onnxruntime_version}.xcframework.zip
+    unzip -o onnxruntime-ios-static-xcframework-${onnxruntime_version}.xcframework.zip
+    rm onnxruntime-ios-static-xcframework-${onnxruntime_version}.xcframework.zip
     popd
   fi
-  cd ios-onnxruntime
-  ln -sfn $onnxruntime_version/onnxruntime.xcframework onnxruntime.xcframework
-  cd ..
 fi
 
-# Create compat dirs so CMake can find libonnxruntime.a and Headers at flat paths.
-# CMake looks for $SHERPA_ONNXRUNTIME_LIB_DIR/libonnxruntime.a on Apple static builds.
-mkdir -p ios-onnxruntime/compat-device ios-onnxruntime/compat-sim
-XCF="$PWD/ios-onnxruntime/$onnxruntime_version/onnxruntime.xcframework"
-ln -sfn "$XCF/ios-arm64/onnxruntime.framework/onnxruntime"              ios-onnxruntime/compat-device/libonnxruntime.a
-ln -sfn "$XCF/ios-arm64/onnxruntime.framework/Headers"                  ios-onnxruntime/compat-device/Headers
-ln -sfn "$XCF/ios-arm64_x86_64-simulator/onnxruntime.framework/onnxruntime" ios-onnxruntime/compat-sim/libonnxruntime.a
-ln -sfn "$XCF/ios-arm64_x86_64-simulator/onnxruntime.framework/Headers"     ios-onnxruntime/compat-sim/Headers
+# Always refresh the unversioned link with -n so a link left by an older version is replaced,
+# not written through. The exports below use the versioned path. # wangqi modified 2026-10-24
+ln -sfn $onnxruntime_version/onnxruntime.xcframework ios-onnxruntime/onnxruntime.xcframework
+XCF="$PWD/$onnxruntime_dir/onnxruntime.xcframework"
 
 # First, for simulator
 echo "Building for simulator (x86_64)"
 
-export SHERPA_ONNXRUNTIME_LIB_DIR=$PWD/ios-onnxruntime/compat-sim
-export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$PWD/ios-onnxruntime/compat-sim/Headers
+export SHERPA_ONNXRUNTIME_LIB_DIR=$XCF/ios-arm64_x86_64-simulator
+export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$XCF/ios-arm64_x86_64-simulator/onnxruntime.framework/Headers
 
 echo "SHERPA_ONNXRUNTIME_LIB_DIR: $SHERPA_ONNXRUNTIME_LIB_DIR"
 echo "SHERPA_ONNXRUNTIME_INCLUDE_DIR $SHERPA_ONNXRUNTIME_INCLUDE_DIR"
@@ -84,11 +72,8 @@ echo "SHERPA_ONNXRUNTIME_INCLUDE_DIR $SHERPA_ONNXRUNTIME_INCLUDE_DIR"
 # The symbol _NSLog is not defined
 #
 
+# Explicit sysroot and compilers from the pinned SDK paths above. # wangqi modified 2026-10-24
 cmake \
-  -DBUILD_PIPER_PHONMIZE_EXE=OFF \
-  -DBUILD_PIPER_PHONMIZE_TESTS=OFF \
-  -DBUILD_ESPEAK_NG_EXE=OFF \
-  -DBUILD_ESPEAK_NG_TESTS=OFF \
   -S .. \
   -DCMAKE_TOOLCHAIN_FILE=./toolchains/ios.toolchain.cmake \
   -DCMAKE_OSX_SYSROOT=$IOS_SIM_SDK_PATH \
@@ -115,11 +100,8 @@ cmake --build build/simulator_x86_64 -j 4
 
 echo "Building for simulator (arm64)"
 
+# Explicit sysroot and compilers from the pinned SDK paths above. # wangqi modified 2026-10-24
 cmake \
-  -DBUILD_PIPER_PHONMIZE_EXE=OFF \
-  -DBUILD_PIPER_PHONMIZE_TESTS=OFF \
-  -DBUILD_ESPEAK_NG_EXE=OFF \
-  -DBUILD_ESPEAK_NG_TESTS=OFF \
   -S .. \
   -DCMAKE_TOOLCHAIN_FILE=./toolchains/ios.toolchain.cmake \
   -DCMAKE_OSX_SYSROOT=$IOS_SIM_SDK_PATH \
@@ -147,14 +129,11 @@ cmake --build build/simulator_arm64 -j 4
 
 echo "Building for arm64"
 
-export SHERPA_ONNXRUNTIME_LIB_DIR=$PWD/ios-onnxruntime/compat-device
-export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$PWD/ios-onnxruntime/compat-device/Headers
+export SHERPA_ONNXRUNTIME_LIB_DIR=$XCF/ios-arm64
+export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$XCF/ios-arm64/onnxruntime.framework/Headers
 
+# Explicit sysroot and compilers from the pinned SDK paths above. # wangqi modified 2026-10-24
 cmake \
-  -DBUILD_PIPER_PHONMIZE_EXE=OFF \
-  -DBUILD_PIPER_PHONMIZE_TESTS=OFF \
-  -DBUILD_ESPEAK_NG_EXE=OFF \
-  -DBUILD_ESPEAK_NG_TESTS=OFF \
   -S .. \
   -DCMAKE_TOOLCHAIN_FILE=./toolchains/ios.toolchain.cmake \
   -DCMAKE_OSX_SYSROOT=$IOS_DEVICE_SDK_PATH \
@@ -186,9 +165,8 @@ echo "Generate xcframework"
 
 mkdir -p "build/simulator/lib"
 for f in libkaldi-native-fbank-core.a libkissfft-float.a libsherpa-onnx-c-api.a libsherpa-onnx-core.a \
-         libsherpa-onnx-fstfar.a libssentencepiece_core.a \
-         libsherpa-onnx-fst.a libsherpa-onnx-kaldifst-core.a libkaldi-decoder-core.a \
-         libucd.a libpiper_phonemize.a libespeak-ng.a; do
+         libsherpa-onnx-fstfar.a libssentencepiece_core.a libutf8proc.a \
+         libsherpa-onnx-fst.a libsherpa-onnx-kaldifst-core.a libkaldi-decoder-core.a; do
   lipo -create build/simulator_arm64/lib/${f} \
                build/simulator_x86_64/lib/${f} \
        -output build/simulator/lib/${f}
@@ -205,10 +183,8 @@ libtool -static -o build/simulator/libsherpa-onnx.a \
   build/simulator/lib/libsherpa-onnx-fst.a   \
   build/simulator/lib/libsherpa-onnx-kaldifst-core.a \
   build/simulator/lib/libkaldi-decoder-core.a \
-  build/simulator/lib/libucd.a \
-  build/simulator/lib/libpiper_phonemize.a \
-  build/simulator/lib/libespeak-ng.a \
-  build/simulator/lib/libssentencepiece_core.a
+  build/simulator/lib/libssentencepiece_core.a \
+  build/simulator/lib/libutf8proc.a
 
 libtool -static -o build/os64/libsherpa-onnx.a \
   build/os64/lib/libkaldi-native-fbank-core.a \
@@ -219,11 +195,13 @@ libtool -static -o build/os64/libsherpa-onnx.a \
   build/os64/lib/libsherpa-onnx-fst.a   \
   build/os64/lib/libsherpa-onnx-kaldifst-core.a \
   build/os64/lib/libkaldi-decoder-core.a \
-  build/os64/lib/libucd.a \
-  build/os64/lib/libpiper_phonemize.a \
-  build/os64/lib/libespeak-ng.a \
-  build/os64/lib/libssentencepiece_core.a
+  build/os64/lib/libssentencepiece_core.a \
+  build/os64/lib/libutf8proc.a
 
+# The fork keeps the library + Headers xcframework layout (libsherpa-onnx.a, Headers/sherpa-onnx/c-api)
+# instead of upstream's SherpaOnnxC.framework bundles: build-xcframework.sh merges these slices with
+# the macOS and Mac Catalyst ones, and sherpa-onnx_swift reads ios-arm64/Headers/sherpa-onnx through
+# its CSherpaOnnx symlink. # wangqi modified 2026-10-24
 rm -rf sherpa-onnx.xcframework
 
 xcodebuild -create-xcframework \

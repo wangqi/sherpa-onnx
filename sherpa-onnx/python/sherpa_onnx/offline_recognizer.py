@@ -40,11 +40,64 @@ def _assert_file_exists(f: str):
 
 
 class OfflineRecognizer(object):
-    """A class for offline speech recognition.
+    """A class for offline (non-streaming) speech recognition.
 
-    Please refer to the following files for usages
-     - https://github.com/k2-fsa/sherpa-onnx/blob/master/sherpa-onnx/python/tests/test_offline_recognizer.py
-     - https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-decode-files.py
+    It supports multiple model families via factory methods:
+
+    - :meth:`from_transducer` -- Zipformer, NeMo transducer, etc.
+    - :meth:`from_paraformer` -- FunASR Paraformer
+    - :meth:`from_sense_voice` -- SenseVoice multilingual model
+    - :meth:`from_whisper` -- OpenAI Whisper
+    - :meth:`from_moonshine` -- Moonshine
+    - :meth:`from_dolphin` -- Dolphin CTC
+    - :meth:`from_nemo_ctc` -- NeMo CTC
+    - :meth:`from_zipformer2_ctc` -- Zipformer CTC
+
+    Example using SenseVoice::
+
+        import sherpa_onnx
+        import soundfile as sf
+
+        recognizer = sherpa_onnx.OfflineRecognizer.from_sense_voice(
+            model="./sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx",
+            tokens="./sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/tokens.txt",
+            use_itn=True,
+            debug=True,
+        )
+
+        audio, sample_rate = sf.read("test.wav", dtype="float32", always_2d=True)
+        audio = audio[:, 0]  # mono
+
+        stream = recognizer.create_stream()
+        stream.accept_waveform(sample_rate, audio)
+        recognizer.decode_stream(stream)
+        print(stream.result)
+
+    Example using Whisper::
+
+        recognizer = sherpa_onnx.OfflineRecognizer.from_whisper(
+            encoder="./sherpa-onnx-whisper-tiny/tiny-encoder.int8.onnx",
+            decoder="./sherpa-onnx-whisper-tiny/tiny-decoder.int8.onnx",
+            tokens="./sherpa-onnx-whisper-tiny/tiny-tokens.txt",
+            language="en",
+            task="transcribe",
+        )
+
+    Example using transducer::
+
+        recognizer = sherpa_onnx.OfflineRecognizer.from_transducer(
+            encoder="./model/encoder-epoch-99-avg-1.int8.onnx",
+            decoder="./model/decoder-epoch-99-avg-1.onnx",
+            joiner="./model/joiner-epoch-99-avg-1.int8.onnx",
+            tokens="./model/tokens.txt",
+            num_threads=2,
+            decoding_method="greedy_search",
+        )
+
+    Please refer to the following files for more usages:
+
+    - `<https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-decode-files.py>`_
+    - `<https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-sense-voice-ctc-decode-files.py>`_
     """
 
     @classmethod
@@ -325,6 +378,23 @@ class OfflineRecognizer(object):
     ):
         """
         Create an offline recognizer for FunASR-nano models.
+
+        Set per-utterance overrides before decoding with
+        ``stream.set_option("hotwords", "Sherpa,FunASR")``,
+        ``stream.set_option("language", "中文")``,
+        ``stream.set_option("itn", "0")``, or
+        ``stream.set_option("user_prompt", "前文：...\\n语音转写：")``.
+        Unset options use the recognizer defaults. Explicit empty hotwords,
+        language, and user_prompt strings clear the corresponding defaults.
+        For itn, "0" disables and any nonzero integer enables ITN (normally
+        use "1"); empty, unparsable, or out-of-range values use the recognizer
+        default. Options affect only their own stream.
+
+        A nonempty user_prompt is used verbatim only when hotwords and language
+        are empty and itn is enabled; otherwise the standard prompt is built
+        from hotwords, language, and itn. An empty user_prompt uses the standard
+        transcription prompt. To supply custom context, clear any configured
+        hotwords/language and set itn to "1" on that stream first.
 
         Args:
           encoder_adaptor:
@@ -905,6 +975,8 @@ class OfflineRecognizer(object):
         hr_dict_dir: str = "",
         hr_rule_fsts: str = "",
         hr_lexicon: str = "",
+        ctc_graph: str = "",
+        ctc_max_active: int = 3000,
     ):
         """
         Please refer to
@@ -939,6 +1011,13 @@ class OfflineRecognizer(object):
           rule_fars:
             If not empty, it specifies fst archives for inverse text normalization.
             If there are multiple archives, they are separated by a comma.
+          ctc_graph:
+            If not empty, it specifies the decoding graph (H.fst, HL.fst or
+            HLG.fst) for CTC+FST decoding. It is used together with the CTC
+            model.
+          ctc_max_active:
+            Used only when ctc_graph is not empty. It specifies the maximum
+            number of active tokens during CTC+FST decoding. 0 means 3000.
         """
         self = cls.__new__(cls)
         model_config = OfflineModelConfig(
@@ -964,6 +1043,10 @@ class OfflineRecognizer(object):
                 dict_dir=hr_dict_dir,
                 lexicon=hr_lexicon,
                 rule_fsts=hr_rule_fsts,
+            ),
+            ctc_fst_decoder_config=OfflineCtcFstDecoderConfig(
+                graph=ctc_graph,
+                max_active=ctc_max_active,
             ),
         )
         self.recognizer = _Recognizer(recognizer_config)
@@ -1089,11 +1172,19 @@ class OfflineRecognizer(object):
                 symbol integer_id
 
           src_lang:
-            The language of the input audio. Valid values are: en, es, de, fr.
-            If you leave it empty, it uses en internally.
+            The language of the input audio, e.g. en, es, de, fr. The codes
+            this model offers are those in its tokens.txt. A code the model
+            does not offer falls back to en (or, if the vocabulary has no
+            en, to the language with the lowest token id) and a warning
+            is logged. If you leave it empty, the same fallback applies
+            without the warning.
           tgt_lang:
-            The language of the output text. Valid values are: en, es, de, fr.
-            If you leave it empty, it uses en internally.
+            The language of the output text, e.g. en, es, de, fr. The codes
+            this model offers are those in its tokens.txt. A code the model
+            does not offer falls back to en (or, if the vocabulary has no
+            en, to the language with the lowest token id) and a warning
+            is logged. If you leave it empty, the same fallback applies
+            without the warning.
           num_threads:
             Number of threads for neural network computation.
           sample_rate:
@@ -1772,13 +1863,84 @@ class OfflineRecognizer(object):
         return self
 
     def create_stream(self, hotwords: Optional[str] = None):
+        """Create a new offline stream for feeding audio data.
+
+        The returned stream should be passed to :meth:`decode_stream` or
+        :meth:`decode_streams` after audio has been accepted.
+
+        Args:
+          hotwords:
+            Optional hotwords string for biasing recognition. Each hotword
+            is separated by ``/``, and tokens within a hotword are separated
+            by a space. For instance, ``"HELLO WORLD/GOODBYE"``.
+            If ``None``, no hotwords biasing is applied.
+
+        Returns:
+          An :class:`OfflineStream` instance.
+
+        Example::
+
+            stream = recognizer.create_stream()
+            stream.accept_waveform(sample_rate, audio)
+            recognizer.decode_stream(stream)
+            print(stream.result)
+
+        Example with hotwords::
+
+            stream = recognizer.create_stream(hotwords="HELLO WORLD/GOODBYE")
+            stream.accept_waveform(sample_rate, audio)
+            recognizer.decode_stream(stream)
+            print(stream.result)
+        """
         if hotwords is None:
             return self.recognizer.create_stream()
         else:
             return self.recognizer.create_stream(hotwords)
 
     def decode_stream(self, s: OfflineStream):
+        """Run speech recognition on a single stream.
+
+        After calling this method, the recognition result is available via
+        ``stream.result.text``.
+
+        Args:
+          s:
+            An :class:`OfflineStream` that has already been fed audio with
+            :meth:`~OfflineStream.accept_waveform`.
+
+        Example::
+
+            stream = recognizer.create_stream()
+            stream.accept_waveform(sample_rate, audio)
+            recognizer.decode_stream(stream)
+            print(stream.result.text)
+        """
         self.recognizer.decode_stream(s)
 
     def decode_streams(self, ss: List[OfflineStream]):
+        """Run speech recognition on multiple streams in parallel.
+
+        This is more efficient than calling :meth:`decode_stream` in a loop,
+        as the internal decoder processes all streams concurrently.
+
+        Args:
+          ss:
+            A list of :class:`OfflineStream` instances, each of which has
+            already been fed audio with
+            :meth:`~OfflineStream.accept_waveform`.
+
+        Example::
+
+            streams = []
+            for audio_file in audio_files:
+                audio, sample_rate = sf.read(audio_file, dtype="float32", always_2d=True)
+                audio = audio[:, 0]  # mono
+                s = recognizer.create_stream()
+                s.accept_waveform(sample_rate, audio)
+                streams.append(s)
+
+            recognizer.decode_streams(streams)
+            for s in streams:
+                print(s.result.text)
+        """
         self.recognizer.decode_streams(ss)

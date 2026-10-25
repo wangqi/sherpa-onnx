@@ -18,6 +18,7 @@
 #include "sherpa-onnx/csrc/offline-speaker-diarization-impl.h"
 #include "sherpa-onnx/csrc/offline-speaker-segmentation-pyannote-model.h"
 #include "sherpa-onnx/csrc/speaker-embedding-extractor.h"
+#include "sherpa-onnx/csrc/timer.h"
 
 namespace sherpa_onnx {
 
@@ -52,6 +53,13 @@ using FloatRowVector = Eigen::Matrix<float, 1, Eigen::Dynamic>;
 using Int32RowVector = Eigen::Matrix<int32_t, 1, Eigen::Dynamic>;
 
 using Int32Pair = std::pair<int32_t, int32_t>;
+
+// One sample interval holding that embedding's silhouette coefficient.
+struct SilhouetteInterval {
+  int32_t start_sample;
+  int32_t end_sample;
+  float silhouette;
+};
 
 class OfflineSpeakerDiarizationPyannoteImpl
     : public OfflineSpeakerDiarizationImpl {
@@ -96,12 +104,16 @@ class OfflineSpeakerDiarizationPyannoteImpl
       const float *audio, int32_t n,
       OfflineSpeakerDiarizationProgressCallback callback = nullptr,
       void *callback_arg = nullptr) const override {
+    Timer total_timer(config_.segmentation.debug);
+    Timer segmentation_timer(config_.segmentation.debug);
     std::vector<Matrix2D> segmentations = RunSpeakerSegmentationModel(audio, n);
     // segmentations[i] is for chunk_i
     // Each matrix is of shape (num_frames, num_powerset_classes)
     if (segmentations.empty()) {
+      // Timings are intentionally not logged since n can be non-positive.
       return {};
     }
+    segmentation_timer.Log("OfflineSpeakerDiarization: segmentation");
 
     std::vector<Matrix2DInt32> labels;
     labels.reserve(segmentations.size());
@@ -117,7 +129,14 @@ class OfflineSpeakerDiarizationPyannoteImpl
         callback(1, 1, callback_arg);
       }
 
-      return HandleOneChunkSpecialCase(labels[0], n);
+      OfflineSpeakerDiarizationResult result =
+          HandleOneChunkSpecialCase(labels[0], n);
+
+      if (config_.segmentation.debug) {
+        LogTotal(static_cast<float>(total_timer.Elapsed()), n);
+      }
+
+      return result;
     }
 
     // labels[i] is a 0-1 matrix of shape (num_frames, num_speakers)
@@ -126,6 +145,9 @@ class OfflineSpeakerDiarizationPyannoteImpl
     Int32RowVector speakers_per_frame = ComputeSpeakersPerFrame(labels);
 
     if (speakers_per_frame.maxCoeff() == 0) {
+      if (config_.segmentation.debug) {
+        LogTotal(static_cast<float>(total_timer.Elapsed()), n);
+      }
       SHERPA_ONNX_LOGE("No speakers found in the audio samples");
       return {};
     }
@@ -138,9 +160,11 @@ class OfflineSpeakerDiarizationPyannoteImpl
     std::vector<int32_t> valid_indexes;
     valid_indexes.reserve(chunk_speaker_samples_list_pair.second.size());
 
+    Timer embedding_timer(config_.segmentation.debug);
     Matrix2D embeddings =
         ComputeEmbeddings(audio, n, chunk_speaker_samples_list_pair.second,
                           &valid_indexes, std::move(callback), callback_arg);
+    embedding_timer.Log("OfflineSpeakerDiarization: embedding");
 
     if (valid_indexes.size() != chunk_speaker_samples_list_pair.second.size()) {
       std::vector<Int32Pair> chunk_speaker_pair;
@@ -149,6 +173,15 @@ class OfflineSpeakerDiarizationPyannoteImpl
       chunk_speaker_pair.reserve(valid_indexes.size());
       sample_indexes.reserve(valid_indexes.size());
       for (auto i : valid_indexes) {
+        if (i < 0 ||
+            i >= static_cast<int32_t>(
+                     chunk_speaker_samples_list_pair.first.size())) {
+          SHERPA_ONNX_LOGE("valid_indexes: index %d out of range [0, %d)",
+                           i,
+                           static_cast<int32_t>(
+                               chunk_speaker_samples_list_pair.first.size()));
+          continue;
+        }
         chunk_speaker_pair.push_back(chunk_speaker_samples_list_pair.first[i]);
         sample_indexes.push_back(
             std::move(chunk_speaker_samples_list_pair.second[i]));
@@ -158,10 +191,17 @@ class OfflineSpeakerDiarizationPyannoteImpl
       chunk_speaker_samples_list_pair.second = std::move(sample_indexes);
     }
 
+    Timer clustering_timer(config_.segmentation.debug);
+    std::vector<float> silhouettes;
     std::vector<int32_t> cluster_labels = clustering_->Cluster(
-        &embeddings(0, 0), embeddings.rows(), embeddings.cols());
+        &embeddings(0, 0), embeddings.rows(), embeddings.cols(),
+        config_.clustering.compute_confidence ? &silhouettes : nullptr);
+    clustering_timer.Log("OfflineSpeakerDiarization: clustering");
 
     if (cluster_labels.empty()) {
+      if (config_.segmentation.debug) {
+        LogTotal(static_cast<float>(total_timer.Elapsed()), n);
+      }
       SHERPA_ONNX_LOGE("No speakers found in the audio samples");
       return {};
     }
@@ -180,12 +220,41 @@ class OfflineSpeakerDiarizationPyannoteImpl
     Matrix2DInt32 final_labels =
         FinalizeLabels(speaker_count, speakers_per_frame);
 
-    auto result = ComputeResult(final_labels);
+    // For each cluster, we keep the list of sample intervals with their
+    // embedding's silhouette value. When we assign the segments, we calculate
+    // the mean of the intervals's silhouettes that overlap the segment.
+    std::unordered_map<int32_t, std::vector<SilhouetteInterval>>
+        cluster_intervals;
+    if (!silhouettes.empty() && silhouettes.size() == cluster_labels.size()) {
+      cluster_intervals = BuildClusterIntervals(
+          chunk_speaker_samples_list_pair.second, cluster_labels, silhouettes);
+    }
+
+    auto result = ComputeResult(final_labels, cluster_intervals);
+
+    if (config_.segmentation.debug) {
+      LogTotal(static_cast<float>(total_timer.Elapsed()), n);
+    }
 
     return result;
   }
 
  private:
+  void LogTotal(float total_seconds, int32_t num_samples) const {
+    float audio_duration = static_cast<float>(num_samples) / SampleRate();
+
+#if __OHOS__
+    SHERPA_ONNX_LOGE(
+        "OfflineSpeakerDiarization: total %{public}.3f s, audio "
+        "%{public}.3f s, RTF %{public}.3f",
+        total_seconds, audio_duration, total_seconds / audio_duration);
+#else
+    SHERPA_ONNX_LOGE(
+        "OfflineSpeakerDiarization: total %.3f s, audio %.3f s, RTF %.3f",
+        total_seconds, audio_duration, total_seconds / audio_duration);
+#endif
+  }
+
   void Init() { InitPowersetMapping(); }
 
   // see also
@@ -514,8 +583,7 @@ class OfflineSpeakerDiarizationPyannoteImpl
     }
 
     if (k != cur_row_index) {
-      auto seq = Eigen::seqN(0, cur_row_index);
-      ans = ans(seq, Eigen::placeholders::all);
+      ans.conservativeResize(cur_row_index, ans.cols());
     }
 
     return ans;
@@ -563,6 +631,15 @@ class OfflineSpeakerDiarizationPyannoteImpl
 
         int32_t new_speaker_index =
             chunk_speaker_to_cluster.at({chunk_index, speaker_index});
+
+        if (new_speaker_index < 0 ||
+            new_speaker_index >= new_label.cols()) {
+          SHERPA_ONNX_LOGE(
+              "ReLabel: new_speaker_index %d out of range [0, %d), skipping",
+              new_speaker_index,
+              static_cast<int32_t>(new_label.cols()));
+          continue;
+        }
 
         for (int32_t k = 0; k != t.cols(); ++k) {
           if (t(speaker_index, k) == 1) {
@@ -643,7 +720,9 @@ class OfflineSpeakerDiarizationPyannoteImpl
   }
 
   OfflineSpeakerDiarizationResult ComputeResult(
-      const Matrix2DInt32 &final_labels) const {
+      const Matrix2DInt32 &final_labels,
+      const std::unordered_map<int32_t, std::vector<SilhouetteInterval>>
+          &cluster_intervals = {}) const {
     Matrix2DInt32 final_labels_t = final_labels.transpose();
     int32_t num_speakers = final_labels_t.rows();
     int32_t num_frames = final_labels_t.cols();
@@ -697,14 +776,66 @@ class OfflineSpeakerDiarizationPyannoteImpl
       // merge segments if the gap between them is less than min_duration_off
       MergeSegments(&this_speaker);
 
-      for (const auto &seg : this_speaker) {
+      // Add the per-segment confidence (if it was at all computed).
+      auto cluster_it = cluster_intervals.find(speaker_index);
+      bool has_intervals = cluster_it != cluster_intervals.end();
+
+      for (auto &seg : this_speaker) {
         if (seg.Duration() > config_.min_duration_on) {
+          if (has_intervals) {
+            seg.SetConfidence(ComputeSegmentConfidence(cluster_it->second, seg,
+                                                       sample_rate));
+          }
           ans.Add(seg);
         }
       }
     }  // for (int32_t speaker_index = 0; speaker_index != num_speakers;
 
     return ans;
+  }
+
+  // Expand each embedding's (chunk, speaker) pairs into its sample
+  // interval ranges with their respectives silhouette values.
+  static std::unordered_map<int32_t, std::vector<SilhouetteInterval>>
+  BuildClusterIntervals(
+      const std::vector<std::vector<Int32Pair>> &sample_indexes,
+      const std::vector<int32_t> &cluster_labels,
+      const std::vector<float> &silhouettes) {
+    std::unordered_map<int32_t, std::vector<SilhouetteInterval>> flattened;
+    for (size_t i = 0; i < cluster_labels.size(); ++i) {
+      int32_t cluster = cluster_labels[i];
+      float silhouette = silhouettes[i];
+      auto &bucket = flattened[cluster];
+      for (const auto &interval : sample_indexes[i]) {
+        bucket.push_back({interval.first, interval.second, silhouette});
+      }
+    }
+    return flattened;
+  }
+
+  // Returns the mean silhouette of every embedding-interval (in this segment's
+  // cluster) whose sample range overlaps the segment. Returns -2 (outside the
+  // valid [-1, 1] range) as the unavailable sentinel when no interval
+  // overlaps.
+  static float ComputeSegmentConfidence(
+      const std::vector<SilhouetteInterval> &cluster_bucket,
+      const OfflineSpeakerDiarizationSegment &segment, int32_t sample_rate) {
+    int32_t seg_start = static_cast<int32_t>(segment.Start() * sample_rate);
+    int32_t seg_end = static_cast<int32_t>(segment.End() * sample_rate);
+
+    double sum = 0.0;
+    int32_t count = 0;
+    for (const auto &interval : cluster_bucket) {
+      if (interval.end_sample > seg_start && interval.start_sample < seg_end) {
+        sum += interval.silhouette;
+        count += 1;
+      }
+    }
+
+    if (count == 0) {
+      return kUnavailableConfidence;
+    }
+    return static_cast<float>(sum / count);
   }
 
   OfflineSpeakerDiarizationResult HandleOneChunkSpecialCase(

@@ -10,13 +10,11 @@
 
 #include <algorithm>
 #include <array>
-#include <cinttypes>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <numeric>
-#include <random>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -47,8 +45,15 @@ constexpr float kMinDuration = 0.1f;
 // Maximum latent length to prevent excessive memory allocation and OOM.
 constexpr int32_t kMaxLatentLen = 10000;
 
-constexpr std::array<std::string_view, 5> kSupertonicAvailableLangs = {
-    "en", "ko", "es", "pt", "fr",
+// "na" (language-agnostic — the model infers the language itself from the
+// text) is a real 32nd tag the upstream Supertonic checkpoint understands
+// (see supertone-inc/supertonic's own Rust preprocessing example); this
+// list was ported from upstream's language enumeration but dropped that
+// entry, hard-blocking a mode the model itself supports.
+constexpr std::array<std::string_view, 32> kSupertonicAvailableLangs = {
+    "en", "ko", "ja", "ar", "bg", "cs", "da", "de", "el", "es", "et",
+    "fi", "fr", "hi", "hr", "hu", "id", "it", "lt", "lv", "nl", "pl",
+    "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi", "na",
 };
 
 void GetLatentMaskFlat(const std::vector<int64_t> &wav_lengths,
@@ -63,6 +68,16 @@ void GetLatentMaskFlat(const std::vector<int64_t> &wav_lengths,
     latent_lengths.push_back((len + wav_chunk_size - 1) / wav_chunk_size);
   }
   LengthsToMask(latent_lengths, mask_flat, mask_shape);
+}
+
+std::string GetSupertonicAvailableLangsString() {
+  std::ostringstream os;
+  const char *sep = "";
+  for (auto lang : kSupertonicAvailableLangs) {
+    os << sep << lang;
+    sep = ", ";
+  }
+  return os.str();
 }
 
 SupertonicStyle ParseVoiceStyleFromBinary(const std::vector<char> &buf) {
@@ -80,8 +95,8 @@ SupertonicStyle ParseVoiceStyleFromBinary(const std::vector<char> &buf) {
   std::memcpy(dims, buf.data(), kHeaderSize);
   for (int i = 0; i < 6; ++i) {
     if (dims[i] <= 0) {
-      SHERPA_ONNX_LOGE("Invalid voice style .bin: dims[%d]=%" PRId64 " <= 0", i,
-                       dims[i]);
+      SHERPA_ONNX_LOGE("Invalid voice style .bin: dims[%d]=%d <= 0", i,
+                       static_cast<int32_t>(dims[i]));
       SHERPA_ONNX_EXIT(-1);
     }
   }
@@ -202,10 +217,11 @@ GeneratedAudio OfflineTtsSupertonicImpl::Generate(
     GeneratedAudioCallback callback) const {
   // Supported extra options in config.extra:
   //   - "speed" (float): Speech speed factor (default: 1.05)
-  //   - "num_steps" (int): Number of denoising steps (default: 5)
-  //   - "lang" (string): Language code, e.g. "en", "ko" (default: "en")
+  //   - "num_steps" (int): Number of denoising steps.
+  //   - "lang" (string): Language code (default: "en"), e.g. "en", "ko",
+  //     "ja".
   //   - sid selects speaker from voice.bin (0 .. NumSpeakers()-1).
-  //   - "max_len" (int): Max chunk length. Default: 300 (non-Korean), 120 (ko).
+  //   - "max_len" (int): Max chunk length. Default: 300, or 120 for ko/ja.
   //   - "silence_duration" (float): Silence in seconds between chunks (default:
   //   0.3)
   //   - "seed" (int): RNG seed for reproducibility. -1 = random (default).
@@ -245,15 +261,17 @@ GeneratedAudio OfflineTtsSupertonicImpl::Generate(
                              kSupertonicAvailableLangs.end(),
                              [&](std::string_view s) { return s == lang; });
   if (!lang_ok) {
-    SHERPA_ONNX_LOGE("Invalid language: %s. Available: en, ko, es, pt, fr",
-                     lang.c_str());
+    auto available_langs = GetSupertonicAvailableLangsString();
+    SHERPA_ONNX_LOGE("Invalid language: %s. Available: %s", lang.c_str(),
+                     available_langs.c_str());
     return {};
   }
 
   float silence_duration = config.GetExtraFloat("silence_duration", 0.3f);
   size_t max_len =
-      (lang == "ko") ? static_cast<size_t>(config.GetExtraInt("max_len", 120))
-                     : static_cast<size_t>(config.GetExtraInt("max_len", 300));
+      (lang == "ko" || lang == "ja")
+          ? static_cast<size_t>(config.GetExtraInt("max_len", 120))
+          : static_cast<size_t>(config.GetExtraInt("max_len", 300));
   if (max_len == 0) {
     SHERPA_ONNX_LOGE("Max length must be > 0. Given: %zu", max_len);
     return {};
@@ -290,9 +308,11 @@ GeneratedAudio OfflineTtsSupertonicImpl::Process(
   int64_t text_seq_len = static_cast<int64_t>(text_ids.size());
   int64_t text_mask_len = text_mask_shape[2];
   if (text_seq_len != text_mask_len) {
-    SHERPA_ONNX_LOGE("Text sequence length mismatch: text_ids=%" PRId64
-                     ", text_mask=%" PRId64 ". Text: \"%s\"",
-                     text_seq_len, text_mask_len, text.c_str());
+    SHERPA_ONNX_LOGE(
+        "Text sequence length mismatch: text_ids=%d"
+        ", text_mask=%d. Text: \"%s\"",
+        static_cast<int32_t>(text_seq_len), static_cast<int32_t>(text_mask_len),
+        text.c_str());
     return {};
   }
 
@@ -396,9 +416,10 @@ GeneratedAudio OfflineTtsSupertonicImpl::Process(
                     &latent_mask_shape);
   int64_t latent_mask_len = latent_mask_shape[2];
   if (latent_mask_len != latent_len) {
-    SHERPA_ONNX_LOGE("Latent mask length mismatch: expected %d, got %" PRId64
-                     ". Text: \"%s\"",
-                     latent_len, latent_mask_len, text.c_str());
+    SHERPA_ONNX_LOGE(
+        "Latent mask length mismatch: expected %d, got %d"
+        ". Text: \"%s\"",
+        latent_len, static_cast<int32_t>(latent_mask_len), text.c_str());
     return {};
   }
   for (int32_t b = 0; b < bsz; ++b) {

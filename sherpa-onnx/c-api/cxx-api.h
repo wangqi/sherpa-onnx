@@ -44,6 +44,7 @@
 #ifndef SHERPA_ONNX_C_API_CXX_API_H_
 #define SHERPA_ONNX_C_API_CXX_API_H_
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -688,6 +689,14 @@ struct OfflineLMConfig {
   float scale = 1.0;
 };
 
+/** @brief Decoder graph configuration for offline CTC + FST decoding. */
+struct OfflineCtcFstDecoderConfig {
+  /** FST graph file. */
+  std::string graph;
+  /** Maximum number of active states during search. */
+  int32_t max_active = 3000;
+};
+
 /**
  * @brief Configuration for offline ASR.
  *
@@ -746,6 +755,8 @@ struct OfflineRecognizerConfig {
   float blank_penalty = 0;
   /** Optional homophone replacement configuration. */
   HomophoneReplacerConfig hr;
+  /** Optional CTC+FST decoder configuration. */
+  OfflineCtcFstDecoderConfig ctc_fst_decoder_config;
 };
 
 /** @brief Offline ASR result copied into C++ containers. */
@@ -848,7 +859,12 @@ struct OfflineTtsVitsModelConfig {
   std::string lexicon;
   /** Token file. */
   std::string tokens;
-  /** Data directory such as `espeak-ng-data`. */
+  /**
+   * Data directory such as `espeak-ng-data`.
+   *
+   * @deprecated Ignored since v2.0.0. Pass pre-phonemized input via
+   * GenerationConfig::phoneme_codepoints (or ::tokens) instead.
+   */
   std::string data_dir;
   /** Reserved field. Currently unused by the wrapper. */
   std::string dict_dir;
@@ -871,7 +887,12 @@ struct OfflineTtsMatchaModelConfig {
   std::string lexicon;
   /** Token file. */
   std::string tokens;
-  /** Data directory such as `espeak-ng-data`. */
+  /**
+   * Data directory such as `espeak-ng-data`.
+   *
+   * @deprecated Ignored since v2.0.0. Pass pre-phonemized input via
+   * GenerationConfig::phoneme_codepoints (or ::tokens) instead.
+   */
   std::string data_dir;
   /** Reserved field. Currently unused by the wrapper. */
   std::string dict_dir;
@@ -890,7 +911,12 @@ struct OfflineTtsKokoroModelConfig {
   std::string voices;
   /** Token file. */
   std::string tokens;
-  /** Data directory such as `espeak-ng-data`. */
+  /**
+   * Data directory such as `espeak-ng-data`.
+   *
+   * @deprecated Ignored since v2.0.0. Pass pre-phonemized input via
+   * GenerationConfig::phoneme_codepoints (or ::tokens) instead.
+   */
   std::string data_dir;
   /** Reserved field. Currently unused by the wrapper. */
   std::string dict_dir;
@@ -911,11 +937,19 @@ struct OfflineTtsKittenModelConfig {
   std::string voices;
   /** Token file. */
   std::string tokens;
-  /** Data directory. */
+  /**
+   * Data directory.
+   *
+   * @deprecated Ignored since v2.0.0. Pass pre-phonemized input via
+   * GenerationConfig::phoneme_codepoints (or ::tokens) instead.
+   */
   std::string data_dir;
 
   /** Length scale. Values < 1 are faster; values > 1 are slower. */
   float length_scale = 1.0;
+
+  /** Lexicon file. */
+  std::string lexicon;
 };
 
 /** @brief ZipVoice model configuration. */
@@ -928,7 +962,12 @@ struct OfflineTtsZipvoiceModelConfig {
   std::string decoder;
   /** Vocoder model file. */
   std::string vocoder;
-  /** Data directory. */
+  /**
+   * Data directory.
+   *
+   * @deprecated Ignored since v2.0.0. Pass pre-phonemized input via
+   * GenerationConfig::phoneme_codepoints (or ::tokens) instead.
+   */
   std::string data_dir;
   /** Lexicon file. */
   std::string lexicon;
@@ -1031,6 +1070,27 @@ struct GenerationConfig {
 
   /** Model-specific extra attributes serialized to JSON internally. */
   std::unordered_map<std::string, std::string> extra;
+
+  /**
+   * Pre-phonemized input as Unicode codepoints.
+   *
+   * Phonemize the text yourself (for instance with piper_phonemize) and pass
+   * the resulting codepoints here. When set, it is used in place of the `text`
+   * argument. Leave empty to use `text` with a lexicon.
+   *
+   * Each inner vector is one sentence.
+   */
+  std::vector<std::vector<int32_t>> phoneme_codepoints;
+
+  /**
+   * Pre-tokenized input, e.g. Chinese pinyin like "zhong1".
+   *
+   * Each inner vector is one sentence.
+   *
+   * Mutually exclusive with `phoneme_codepoints`: if both are set, a warning
+   * is printed and generation fails.
+   */
+  std::vector<std::vector<std::string>> tokens;
 };
 
 /** @brief Configuration for offline TTS. */
@@ -1101,6 +1161,11 @@ class SHERPA_ONNX_API OfflineTts
 
   /** @brief Return the number of supported speakers. */
   int32_t NumSpeakers() const;
+
+  /** @brief Return the language/voice of the model, e.g., "en-us".
+   *
+   * Returns an empty string if such information is not available. */
+  std::string Lang() const;
 
   /**
    * @brief Generate speech using the simple speaker-id and speed interface.
@@ -1218,6 +1283,8 @@ struct OfflineSpeechDenoiserGtcrnModelConfig {
 struct OfflineSpeechDenoiserDpdfNetModelConfig {
   /** Model ONNX file. */
   std::string model;
+  /** Offline attenuation limit in dB. 0 disables it. */
+  float attenuation_limit_db = 0.0f;
 };
 
 /**
@@ -1370,8 +1437,11 @@ struct VadModelConfig {
 
 /** @brief One speech segment produced by the VAD wrapper. */
 struct SpeechSegment {
-  /** Start sample index relative to the processed audio timeline. */
-  int32_t start = 0;
+  /** Start sample index relative to the processed audio timeline.
+   *
+   * It is an absolute position and keeps increasing during the lifetime of
+   * a detector, so it is 64-bit. */
+  int64_t start = 0;
   /** Speech samples for the segment. */
   std::vector<float> samples;
 };
@@ -1390,7 +1460,7 @@ class SHERPA_ONNX_API CircularBuffer
   void Push(const float *p, int32_t n) const;
 
   /** @brief Copy a contiguous span from the buffer. */
-  std::vector<float> Get(int32_t start_index, int32_t n) const;
+  std::vector<float> Get(int64_t start_index, int32_t n) const;
 
   /** @brief Remove samples from the head of the buffer. */
   void Pop(int32_t n) const;
@@ -1399,7 +1469,7 @@ class SHERPA_ONNX_API CircularBuffer
   int32_t Size() const;
 
   /** @brief Return the current head index. */
-  int32_t Head() const;
+  int64_t Head() const;
 
   /** @brief Reset the buffer to empty. */
   void Reset() const;
@@ -1491,6 +1561,8 @@ SHERPA_ONNX_API std::string GetVersionStr();
 SHERPA_ONNX_API std::string GetGitSha1();
 /** @brief Return the build Git date as a C++ string. */
 SHERPA_ONNX_API std::string GetGitDate();
+/** @brief Return the onnxruntime version string as a C++ string. */
+SHERPA_ONNX_API std::string GetOnnxruntimeVersionStr();
 /** @brief Return `true` if a file exists. */
 SHERPA_ONNX_API bool FileExists(const std::string &filename);
 
@@ -1738,6 +1810,313 @@ class SHERPA_ONNX_API OfflineSourceSeparation
 
  private:
   explicit OfflineSourceSeparation(const SherpaOnnxOfflineSourceSeparation *p);
+};
+
+// ============================================================================
+// Spoken Language Identification
+// ============================================================================
+
+/** @brief Whisper model configuration for spoken language identification. */
+struct SpokenLanguageIdentificationWhisperConfig {
+  /** Whisper encoder model. */
+  std::string encoder;
+  /** Whisper decoder model. */
+  std::string decoder;
+  /** Optional tail padding in samples. */
+  int32_t tail_paddings = 0;
+};
+
+/** @brief Configuration for spoken language identification. */
+struct SpokenLanguageIdentificationConfig {
+  /** Whisper model configuration. */
+  SpokenLanguageIdentificationWhisperConfig whisper;
+  /** Number of inference threads. */
+  int32_t num_threads = 1;
+  /** Enable verbose debug logging. */
+  bool debug = false;
+  /** Execution provider such as `"cpu"`. */
+  std::string provider = "cpu";
+};
+
+/** @brief Result of spoken language identification. */
+struct SpokenLanguageIdentificationResult {
+  /** Predicted language code such as `"en"`, `"de"`, `"zh"`, or `"es"`. */
+  std::string lang;
+};
+
+/** @brief RAII wrapper for spoken language identification. */
+class SHERPA_ONNX_API SpokenLanguageIdentification
+    : public MoveOnly<SpokenLanguageIdentification,
+                      SherpaOnnxSpokenLanguageIdentification> {
+ public:
+  /** @brief Create a spoken language identifier. */
+  static SpokenLanguageIdentification Create(
+      const SpokenLanguageIdentificationConfig &config);
+
+  /** @brief Destroy the wrapped C handle. */
+  void Destroy(const SherpaOnnxSpokenLanguageIdentification *p) const;
+
+  /** @brief Create an offline stream for identification. */
+  OfflineStream CreateStream() const;
+
+  /** @brief Run spoken language identification on a stream. */
+  SpokenLanguageIdentificationResult Compute(const OfflineStream *s) const;
+
+ private:
+  explicit SpokenLanguageIdentification(
+      const SherpaOnnxSpokenLanguageIdentification *p);
+};
+
+// ============================================================================
+// Speaker Embedding Extractor
+// ============================================================================
+
+/** @brief Configuration for speaker embedding extraction. */
+struct SpeakerEmbeddingExtractorConfig {
+  /** Speaker embedding model file. */
+  std::string model;
+  /** Number of inference threads. */
+  int32_t num_threads = 1;
+  /** Enable verbose debug logging. */
+  bool debug = false;
+  /** Execution provider such as `"cpu"`. */
+  std::string provider = "cpu";
+};
+
+/** @brief RAII wrapper for speaker embedding extraction. */
+class SHERPA_ONNX_API SpeakerEmbeddingExtractor
+    : public MoveOnly<SpeakerEmbeddingExtractor,
+                      SherpaOnnxSpeakerEmbeddingExtractor> {
+ public:
+  /** @brief Create a speaker embedding extractor. */
+  static SpeakerEmbeddingExtractor Create(
+      const SpeakerEmbeddingExtractorConfig &config);
+
+  /** @brief Destroy the wrapped C handle. */
+  void Destroy(const SherpaOnnxSpeakerEmbeddingExtractor *p) const;
+
+  /** @brief Return the embedding dimension. */
+  int32_t Dim() const;
+
+  /** @brief Create a stream for embedding extraction. */
+  OnlineStream CreateStream() const;
+
+  /** @brief Check whether enough audio has been provided. */
+  bool IsReady(const OnlineStream *s) const;
+
+  /** @brief Compute the embedding for a stream. */
+  std::vector<float> ComputeEmbedding(const OnlineStream *s) const;
+
+ private:
+  explicit SpeakerEmbeddingExtractor(
+      const SherpaOnnxSpeakerEmbeddingExtractor *p);
+};
+
+// ============================================================================
+// Speaker Embedding Manager
+// ============================================================================
+
+/** @brief One speaker match returned by the best-matches API. */
+struct SpeakerMatch {
+  /** Similarity score. Larger means more similar. */
+  float score;
+  /** Speaker name. */
+  std::string name;
+};
+
+/** @brief RAII wrapper for speaker embedding management. */
+class SHERPA_ONNX_API SpeakerEmbeddingManager
+    : public MoveOnly<SpeakerEmbeddingManager,
+                      SherpaOnnxSpeakerEmbeddingManager> {
+ public:
+  /** @brief Create a speaker embedding manager. */
+  static SpeakerEmbeddingManager Create(int32_t dim);
+
+  /** @brief Destroy the wrapped C handle. */
+  void Destroy(const SherpaOnnxSpeakerEmbeddingManager *p) const;
+
+  /** @brief Add one enrollment embedding for a speaker. */
+  bool Add(const std::string &name, const float *v) const;
+
+  /** @brief Add multiple enrollment embeddings for one speaker. */
+  bool AddList(const std::string &name, const float **v) const;
+
+  /** @brief Add multiple enrollment embeddings packed in one flat array. */
+  bool AddListFlattened(const std::string &name, const float *v,
+                        int32_t n) const;
+
+  /** @brief Remove a speaker from the manager. */
+  bool Remove(const std::string &name) const;
+
+  /** @brief Search for the best matching enrolled speaker. */
+  std::string Search(const float *v, float threshold) const;
+
+  /** @brief Return up to n best matches above a similarity threshold. */
+  std::vector<SpeakerMatch> GetBestMatches(const float *v, float threshold,
+                                           int32_t n) const;
+
+  /** @brief Verify whether a query embedding matches a named speaker. */
+  bool Verify(const std::string &name, const float *v, float threshold) const;
+
+  /** @brief Check whether a speaker is enrolled. */
+  bool Contains(const std::string &name) const;
+
+  /** @brief Return the number of enrolled speakers. */
+  int32_t NumSpeakers() const;
+
+  /** @brief Return the embedding dimension. */
+  int32_t Dim() const;
+
+  /** @brief Return all enrolled speaker names. */
+  std::vector<std::string> GetAllSpeakers() const;
+
+  /** @brief Return a copy of the embedding of a speaker. Empty if missing. */
+  std::vector<float> GetEmbedding(const std::string &name) const;
+
+ private:
+  explicit SpeakerEmbeddingManager(const SherpaOnnxSpeakerEmbeddingManager *p);
+};
+
+// ============================================================================
+// Offline Speaker Diarization
+// ============================================================================
+
+/** @brief Pyannote segmentation model configuration. */
+struct OfflineSpeakerSegmentationPyannoteModelConfig {
+  /** Segmentation model filename. */
+  std::string model;
+  /** Sliding-window shift as a fraction of the model window size. */
+  float window_shift_ratio = 0.1f;
+};
+
+/** @brief Segmentation model configuration for offline speaker diarization. */
+struct OfflineSpeakerSegmentationModelConfig {
+  /** Pyannote segmentation model configuration. */
+  OfflineSpeakerSegmentationPyannoteModelConfig pyannote;
+  /** Number of inference threads. */
+  int32_t num_threads = 1;
+  /** Enable verbose debug logging. */
+  bool debug = false;
+  /** Execution provider such as `"cpu"`. */
+  std::string provider = "cpu";
+};
+
+/** @brief Fast clustering configuration. */
+struct FastClusteringConfig {
+  /** Known number of speakers. If > 0, threshold-based clustering is bypassed.
+   */
+  int32_t num_clusters = 0;
+  /** Distance threshold used when the number of speakers is unknown. */
+  float threshold = 0.5;
+  /** If true, each returned diarization segment carries a confidence value. */
+  bool compute_confidence = false;
+};
+
+/** @brief Configuration for offline speaker diarization. */
+struct OfflineSpeakerDiarizationConfig {
+  /** Speaker segmentation model configuration. */
+  OfflineSpeakerSegmentationModelConfig segmentation;
+  /** Speaker embedding extractor configuration. */
+  SpeakerEmbeddingExtractorConfig embedding;
+  /** Clustering configuration. */
+  FastClusteringConfig clustering;
+  /** Segments shorter than this duration in seconds are discarded. */
+  float min_duration_on = 0;
+  /** Small gaps shorter than this duration in seconds may be merged. */
+  float min_duration_off = 0;
+};
+
+/** @brief One diarization segment. */
+struct OfflineSpeakerDiarizationSegment {
+  /** Sentinel returned in 'confidence' when the value is unavailable */
+  static constexpr float kUnavailableConfidence = -2.0f;
+
+  /** Segment start time in seconds. */
+  float start;
+  /** Segment end time in seconds. */
+  float end;
+  /** Speaker label, typically an integer cluster ID. */
+  int32_t speaker;
+  /** Confidence value in [-1, 1] when clustering.compute_confidence is set on
+   * the config. Otherwise equals kUnavailableConfidence.
+   */
+  float confidence = kUnavailableConfidence;
+};
+
+/** @brief Progress callback for offline speaker diarization. */
+using OfflineSpeakerDiarizationProgressCallback =
+    std::function<void(int32_t num_processed_chunks, int32_t num_total_chunks)>;
+
+/** @brief RAII wrapper for offline speaker diarization. */
+class SHERPA_ONNX_API OfflineSpeakerDiarization
+    : public MoveOnly<OfflineSpeakerDiarization,
+                      SherpaOnnxOfflineSpeakerDiarization> {
+ public:
+  /** @brief Create an offline speaker diarization pipeline. */
+  static OfflineSpeakerDiarization Create(
+      const OfflineSpeakerDiarizationConfig &config);
+
+  /** @brief Destroy the wrapped C handle. */
+  void Destroy(const SherpaOnnxOfflineSpeakerDiarization *p) const;
+
+  /** @brief Return the expected input sample rate. */
+  int32_t GetSampleRate() const;
+
+  /** @brief Update clustering-related settings. */
+  void SetConfig(const OfflineSpeakerDiarizationConfig &config) const;
+
+  /** @brief Run offline speaker diarization. */
+  std::vector<OfflineSpeakerDiarizationSegment> Process(
+      const float *samples, int32_t n) const;
+
+  /** @brief Run offline speaker diarization with a progress callback. */
+  std::vector<OfflineSpeakerDiarizationSegment> Process(
+      const float *samples, int32_t n,
+      const OfflineSpeakerDiarizationProgressCallback &callback) const;
+
+ private:
+  explicit OfflineSpeakerDiarization(
+      const SherpaOnnxOfflineSpeakerDiarization *p);
+};
+
+// ============================================================================
+// Offline Diacritization
+// ============================================================================
+/** @brief Offline diacritization model configuration. */
+struct OfflineDiacritizationModelConfig {
+  /** Encoder CATT model file. */
+  std::string catt_encoder;
+  /** Decoder CATT model file. */
+  std::string catt_decoder;
+  /** Number of inference threads. */
+  int32_t num_threads = 1;
+  /** Enable verbose debug logging. */
+  bool debug = false;
+  /** Execution provider such as `"cpu"`. */
+  std::string provider = "cpu";
+};
+
+/** @brief Configuration for offline diacritization. */
+struct OfflineDiacritizationConfig {
+  /** Model configuration. */
+  OfflineDiacritizationModelConfig model;
+};
+
+/** @brief RAII wrapper for offline diacritization. */
+class SHERPA_ONNX_API OfflineDiacritization
+    : public MoveOnly<OfflineDiacritization, SherpaOnnxOfflineDiacritization> {
+ public:
+  /** @brief Create an offline diacritization model. */
+  static OfflineDiacritization Create(const OfflineDiacritizationConfig &config);
+
+  /** @brief Destroy the wrapped C handle. */
+  void Destroy(const SherpaOnnxOfflineDiacritization *diacrt) const;
+
+  /** @brief Add diacritics to a complete input text. */
+  std::string AddDiacritics(const std::string &text) const;
+
+ private:
+  explicit OfflineDiacritization(const SherpaOnnxOfflineDiacritization *diacrt);
 };
 
 }  // namespace sherpa_onnx::cxx

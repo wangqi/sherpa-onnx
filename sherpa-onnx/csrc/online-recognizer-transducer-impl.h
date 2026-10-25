@@ -26,6 +26,7 @@
 #include "sherpa-onnx/csrc/online-transducer-modified-beam-search-decoder.h"
 #include "sherpa-onnx/csrc/onnx-utils.h"
 #include "sherpa-onnx/csrc/symbol-table.h"
+#include "sherpa-onnx/csrc/text-utils.h"
 #include "sherpa-onnx/csrc/utils.h"
 #include "ssentencepiece/csrc/ssentencepiece.h"
 
@@ -65,6 +66,8 @@ OnlineRecognizerResult Convert(const OnlineTransducerDecoderResult &src,
     text = sym_table.DecodeByteBpe(text);
   }
 
+  text = RemoveSpaceBetweenCjk(text);
+
   r.text = std::move(text);
 
   float frame_shift_s = frame_shift_ms / 1000. * subsampling_factor;
@@ -76,6 +79,7 @@ OnlineRecognizerResult Convert(const OnlineTransducerDecoderResult &src,
   r.ys_probs = std::move(src.ys_probs);
   r.lm_probs = std::move(src.lm_probs);
   r.context_scores = std::move(src.context_scores);
+  r.num_trailing_blanks = src.num_trailing_blanks;
 
   r.segment = segment;
   r.start_time = frames_since_start * frame_shift_ms / 1000.;
@@ -439,7 +443,7 @@ class OnlineRecognizerTransducerImpl : public OnlineRecognizerImpl {
   void InitHotwords() {
     // each line in hotwords_file contains space-separated words
 
-    std::ifstream is(config_.hotwords_file);
+    auto is = OpenInputFile(config_.hotwords_file);
     if (!is) {
       SHERPA_ONNX_LOGE("Open hotwords file failed: %s",
                        config_.hotwords_file.c_str());

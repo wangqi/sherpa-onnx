@@ -29,10 +29,12 @@ Usage examples:
 wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2
 tar xf vits-piper-en_US-amy-low.tar.bz2
 
+wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/lexicon-en-us.txt
+
 ./bin/sherpa-onnx-offline-tts \
  --vits-model=./vits-piper-en_US-amy-low/en_US-amy-low.onnx \
  --vits-tokens=./vits-piper-en_US-amy-low/tokens.txt \
- --vits-data-dir=./vits-piper-en_US-amy-low/espeak-ng-data \
+ --vits-lexicon=./lexicon-en-us.txt \
  --output-filename=./generated.wav \
   "Today as always, men fall into two groups: slaves and free men. Whoever does not have two-thirds of his day for himself, is a slave, whatever he may be: a statesman, a businessman, an official, or a scholar."
 
@@ -55,18 +57,19 @@ tar xf sherpa-onnx-pocket-tts-int8-2026-01-26.tar.bz2
 
 Supertonic TTS:
 
-wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-supertonic-tts-int8-2026-03-06.tar.bz2
-tar xf sherpa-onnx-supertonic-tts-int8-2026-03-06.tar.bz2
+wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2
+tar xf sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2
 
 ./bin/sherpa-onnx-offline-tts \
- --supertonic-duration-predictor=./sherpa-onnx-supertonic-tts-int8-2026-03-06/duration_predictor.int8.onnx \
- --supertonic-text-encoder=./sherpa-onnx-supertonic-tts-int8-2026-03-06/text_encoder.int8.onnx \
- --supertonic-vector-estimator=./sherpa-onnx-supertonic-tts-int8-2026-03-06/vector_estimator.int8.onnx \
- --supertonic-vocoder=./sherpa-onnx-supertonic-tts-int8-2026-03-06/vocoder.int8.onnx \
- --supertonic-tts-json=./sherpa-onnx-supertonic-tts-int8-2026-03-06/tts.json \
- --supertonic-unicode-indexer=./sherpa-onnx-supertonic-tts-int8-2026-03-06/unicode_indexer.bin \
- --supertonic-voice-style=./sherpa-onnx-supertonic-tts-int8-2026-03-06/voice.bin \
+ --supertonic-duration-predictor=./sherpa-onnx-supertonic-3-tts-int8-2026-05-11/duration_predictor.int8.onnx \
+ --supertonic-text-encoder=./sherpa-onnx-supertonic-3-tts-int8-2026-05-11/text_encoder.int8.onnx \
+ --supertonic-vector-estimator=./sherpa-onnx-supertonic-3-tts-int8-2026-05-11/vector_estimator.int8.onnx \
+ --supertonic-vocoder=./sherpa-onnx-supertonic-3-tts-int8-2026-05-11/vocoder.int8.onnx \
+ --supertonic-tts-json=./sherpa-onnx-supertonic-3-tts-int8-2026-05-11/tts.json \
+ --supertonic-unicode-indexer=./sherpa-onnx-supertonic-3-tts-int8-2026-05-11/unicode_indexer.bin \
+ --supertonic-voice-style=./sherpa-onnx-supertonic-3-tts-int8-2026-05-11/voice.bin \
  --lang=en \
+ --num-steps=8 \
  --output-filename=./generated-supertonic.wav \
  "Hello from Supertonic TTS"
 
@@ -75,12 +78,12 @@ ZipVoice TTS:
 wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-zipvoice-distill-int8-zh-en-emilia.tar.bz2
 tar xf sherpa-onnx-zipvoice-distill-int8-zh-en-emilia.tar.bz2
 wget https://github.com/k2-fsa/sherpa-onnx/releases/download/vocoder-models/vocos_24khz.onnx
+wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/lexicon-en-us.txt
 
 ./bin/sherpa-onnx-offline-tts \
  --zipvoice-encoder=./sherpa-onnx-zipvoice-distill-int8-zh-en-emilia/encoder.int8.onnx \
  --zipvoice-decoder=./sherpa-onnx-zipvoice-distill-int8-zh-en-emilia/decoder.int8.onnx \
- --zipvoice-data-dir=./sherpa-onnx-zipvoice-distill-int8-zh-en-emilia/espeak-ng-data \
- --zipvoice-lexicon=./sherpa-onnx-zipvoice-distill-int8-zh-en-emilia/lexicon.txt \
+ --zipvoice-lexicon=./sherpa-onnx-zipvoice-distill-int8-zh-en-emilia/lexicon.txt,./lexicon-en-us.txt \
  --zipvoice-tokens=./sherpa-onnx-zipvoice-distill-int8-zh-en-emilia/tokens.txt \
  --zipvoice-vocoder=./vocos_24khz.onnx \
  --reference-audio=./sherpa-onnx-zipvoice-distill-int8-zh-en-emilia/test_wavs/leijun-1.wav \
@@ -102,6 +105,7 @@ or details.
   sherpa_onnx::ParseOptions po(kUsageMessage);
   std::string output_filename = "./generated.wav";
   int32_t sid = 0;
+  int32_t emotion_id = -1;
 
   std::string reference_audio;
   po.Register(
@@ -117,22 +121,27 @@ or details.
 
   std::string lang;
 
-  po.Register(
-      "num-steps", &gen_config.num_steps,
-      "Used by some models, e.g., Pocket TTS and ZipVoice. Number of flow "
-      "matching steps.");
+  po.Register("num-steps", &gen_config.num_steps,
+              "Used by some models, e.g., Supertonic, Pocket TTS and ZipVoice. "
+              "Number of flow matching steps.");
 
   po.Register("output-filename", &output_filename,
               "Path to save the generated audio");
 
-  po.Register("lang", &lang,
-              "Language for text: en, ko, es, pt, fr. Used only by "
-              "Supertonic TTS.");
+  po.Register(
+      "lang", &lang,
+      "Language code for Supertonic TTS. Supported values: en, ko, ja, ar, "
+      "bg, cs, da, de, el, es, et, fi, fr, hi, hr, hu, id, it, lt, lv, nl, "
+      "pl, pt, ro, ru, sk, sl, sv, tr, uk, vi.");
 
   po.Register("sid", &sid,
               "Speaker ID. Used only for multi-speaker models, e.g., models "
               "trained using the VCTK dataset. Not used for single-speaker "
               "models, e.g., models trained using the LJSpeech dataset");
+
+  po.Register("emotion-id", &emotion_id,
+              "Emotion ID. Used only for models that support emotion "
+              "selection. Ignored otherwise.");
 
   po.Register("speed", &gen_config.speed,
               "Speech speed. Larger=faster. Used by Supertonic, VITS, etc. "
@@ -177,6 +186,11 @@ or details.
                          !config.model.zipvoice.decoder.empty();
 
   gen_config.sid = sid;
+  gen_config.silence_scale = config.silence_scale;
+
+  if (emotion_id >= 0) {
+    gen_config.extra["emotion_id"] = std::to_string(emotion_id);
+  }
 
   if (is_supertonic_tts && !lang.empty()) {
     gen_config.extra["lang"] = lang;

@@ -18,6 +18,7 @@ on:
       - '.github/scripts/test-offline-tts.sh'
       - '.github/scripts/test-online-ctc.sh'
       - '.github/scripts/test-audio-tagging.sh'
+      - '.github/scripts/test-offline-diacritization.sh'
       - '.github/scripts/test-offline-punctuation.sh'
       - '.github/scripts/test-online-punctuation.sh'
       - '.github/scripts/test-speaker-diarization.sh'
@@ -41,6 +42,7 @@ on:
       - '.github/scripts/test-offline-tts.sh'
       - '.github/scripts/test-online-ctc.sh'
       - '.github/scripts/test-audio-tagging.sh'
+      - '.github/scripts/test-offline-diacritization.sh'
       - '.github/scripts/test-offline-punctuation.sh'
       - '.github/scripts/test-online-punctuation.sh'
       - '.github/scripts/test-speaker-diarization.sh'
@@ -124,11 +126,6 @@ jobs:
           ls -lh bin
 
           file ./bin/sherpa-onnx
-
-          rm -fv ./install/include/cargs.h
-          rm -fv ./install/lib/cargs.h
-          rm -fv ./install/lib/libcargs.dylib
-          rm -fv ./install/lib/libcargs.a
           rm -rfv ./install/lib/pkgconfig
 
       - name: Display dependencies of sherpa-onnx for macos
@@ -142,6 +139,18 @@ jobs:
         if: matrix.build_type == 'Release'
         shell: bash
         run: |
+          sign_macos_tree() {
+            root_dir="$1"
+
+            while IFS= read -r -d '' f; do
+              if file -b "$f" | grep -q '^Mach-O'; then
+                codesign --force --sign - --timestamp=none \
+                  --preserve-metadata=identifier,entitlements,flags,runtime "$f"
+                codesign --verify --strict --verbose=2 "$f"
+              fi
+            done < <(find "$root_dir" -type f \( -path "$root_dir/bin/*" -o -path "$root_dir/lib/*.dylib*" \) -print0)
+          }
+
           thin_macos_tree() {
             src_dir="$1"
             dst_dir="$2"
@@ -177,18 +186,18 @@ jobs:
           brew install tree
           tree $dst
 
+          sign_macos_tree "$dst"
           tar cjvf ${dst}.tar.bz2 $dst
 
           lib_dst=${dst}-lib
           mkdir -p ${lib_dst}/lib
           if [[ ${{ matrix.lib_type }} == shared ]]; then
             cp -av build/install/lib/lib*.dylib* ${lib_dst}/lib/
-            rm -f ${lib_dst}/lib/libcargs.dylib ${lib_dst}/lib/libcargs*.dylib
           else
             cp -av build/install/lib/lib*.a ${lib_dst}/lib/
-            rm -f ${lib_dst}/lib/libcargs.a
           fi
           tree ${lib_dst}
+          sign_macos_tree "$lib_dst"
           tar cjvf ${lib_dst}.tar.bz2 ${lib_dst}
 
           for arch in x86_64 arm64; do
@@ -201,11 +210,13 @@ jobs:
             arch_dst=${dst/osx-universal2/osx-${arch_name}}
             thin_macos_tree "$dst" "$arch_dst" "$arch"
             tree "$arch_dst"
+            sign_macos_tree "$arch_dst"
             tar cjvf ${arch_dst}.tar.bz2 ${arch_dst}
 
             arch_lib_dst=${lib_dst/osx-universal2/osx-${arch_name}}
             thin_macos_tree "$lib_dst" "$arch_lib_dst" "$arch"
             tree "$arch_lib_dst"
+            sign_macos_tree "$arch_lib_dst"
             tar cjvf ${arch_lib_dst}.tar.bz2 ${arch_lib_dst}
           done
 
@@ -218,7 +229,7 @@ jobs:
           file: sherpa-onnx-*.tar.bz2
           repo_name: k2-fsa/sherpa-onnx
           repo_token: ${{ secrets.UPLOAD_GH_SHERPA_ONNX_TOKEN }}
-          tag: v1.12.31
+          tag: v2.0.0
 
       - name: Release pre-compiled binaries and libs for macOS
         if: github.repository_owner == 'k2-fsa' && github.event_name == 'push' && contains(github.ref, 'refs/tags/') && matrix.build_type == 'Release'
@@ -342,6 +353,15 @@ jobs:
 
           .github/scripts/test-offline-punctuation.sh
 
+      - name: Test offline diacritization
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        shell: bash
+        run: |
+          export PATH=$PWD/build/bin:$PATH
+          export EXE=sherpa-onnx-offline-diacritization
+
+          .github/scripts/test-offline-diacritization.sh
+
       - name: Test C API
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         shell: bash
@@ -351,6 +371,7 @@ jobs:
           export SID_EXE=speaker-identification-c-api
           export AT_EXE=audio-tagging-c-api
           export PUNCT_EXE=add-punctuation-c-api
+          export VERSION_EXE=version-c-api
 
           .github/scripts/test-c-api.sh
 

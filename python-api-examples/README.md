@@ -1,9 +1,12 @@
 # File description
 
-- [./http_server.py](./http_server.py) It defines which files to server.
+- [./http_server.py](./http_server.py) It defines which files to serve.
   Files are saved in [./web](./web).
 - [non_streaming_server.py](./non_streaming_server.py) WebSocket server for
   non-streaming models.
+- [Orukeet](./orukeet.md) Download and serve the multilingual Orukeet model
+  using the existing NeMo transducer runtime. The same server options support
+  Parakeet TDT v3.
 - [vad-remove-non-speech-segments.py](./vad-remove-non-speech-segments.py) It uses
   [silero-vad](https://github.com/snakers4/silero-vad) to remove non-speech
   segments and concatenate all speech segments into a single one.
@@ -21,9 +24,10 @@
 
 - [online-speech-enhancement-dpdfnet.py](./online-speech-enhancement-dpdfnet.py)
   It shows how to use the online speech denoiser API with DPDFNet.
-  models. Use 16 kHz DPDFNet models such as `dpdfnet_baseline.onnx`,
+  Use 16 kHz DPDFNet models such as `dpdfnet_baseline.onnx`,
   `dpdfnet2.onnx`, `dpdfnet4.onnx`, or `dpdfnet8.onnx` for downstream ASR and
-  `dpdfnet2_48khz_hr.onnx` for 48 kHz enhancement output.
+  `dpdfnet2_8khz.onnx` or `dpdfnet8_8khz.onnx` for 8 kHz enhancement.
+  Use `dpdfnet2_48khz_hr.onnx` or `dpdfnet8_48khz_hr.onnx` for 48 kHz output.
 
 - [pocket-tts.py](./pocket-tts.py) It shows how to use PocketTTS with the
   `GenerationConfig` API.

@@ -24,6 +24,11 @@ def get_args():
         default=0,
         help="Index of the current runner",
     )
+    parser.add_argument(
+        "--count",
+        action="store_true",
+        help="Print the total number of models and exit",
+    )
     return parser.parse_args()
 
 
@@ -38,13 +43,21 @@ class TtsModel:
     lang2: str = ""  # en, zh, fr, de, etc.
     rule_fsts: Optional[List[str]] = None
     rule_fars: Optional[List[str]] = None
-    data_dir: Optional[str] = None
+    phonemize: bool = False
     dict_dir: Optional[str] = None
     is_char: bool = False
     lang_iso_639_3: str = ""
     lang_iso_639_3_2: str = ""
     lexicon: str = ""
     is_kitten: bool = False
+    is_supertonic: bool = False
+    supertonic_duration_predictor: str = ""
+    supertonic_text_encoder: str = ""
+    supertonic_vector_estimator: str = ""
+    supertonic_vocoder: str = ""
+    supertonic_tts_json: str = ""
+    supertonic_unicode_indexer: str = ""
+    supertonic_voice_style: str = ""
 
 
 def convert_lang_to_iso_639_3(models: List[TtsModel]):
@@ -65,7 +78,7 @@ def get_coqui_models() -> List[TtsModel]:
     ]
 
     for m in models:
-        m.data_dir = m.model_dir + "/" + "espeak-ng-data"
+        m.phonemize = True
         m.model_name = "model.onnx"
         m.lang = "en"
 
@@ -121,6 +134,7 @@ def get_piper_models() -> List[TtsModel]:
         TtsModel(model_dir="vits-piper-de_DE-eva_k-x_low"),
         TtsModel(model_dir="vits-piper-de_DE-karlsson-low"),
         TtsModel(model_dir="vits-piper-de_DE-kerstin-low"),
+        TtsModel(model_dir="vits-piper-de_DE-glados-low"),
         TtsModel(model_dir="vits-piper-de_DE-dii-high"),
         TtsModel(model_dir="vits-piper-de_DE-miro-high"),
         #  TtsModel(model_dir="vits-piper-de_DE-mls-medium"),
@@ -292,10 +306,10 @@ def get_piper_models() -> List[TtsModel]:
         if "zh_CN" in m.model_dir and (
             "xiao_ya" in m.model_dir or "chaowen" in m.model_dir
         ):
-            m.lexicon = f"{m.model_dir}/lexicon.txt"
+            m.lexicon = "lexicon.txt"
             m.rule_fsts = f"{m.model_dir}/phone.fst,{m.model_dir}/date.fst,{m.model_dir}/number.fst"
         else:
-            m.data_dir = m.model_dir + "/" + "espeak-ng-data"
+            m.phonemize = True
 
         m.model_name = m.model_dir[len("vits-piper-") :] + ".onnx"
         m.lang = m.model_dir.split("-")[2][:2]
@@ -319,7 +333,7 @@ def get_mimic3_models() -> List[TtsModel]:
         TtsModel(model_dir="vits-mimic3-vi_VN-vais1000_low"),
     ]
     for m in models:
-        m.data_dir = m.model_dir + "/" + "espeak-ng-data"
+        m.phonemize = True
         m.model_name = m.model_dir[len("vits-mimic3-") :] + ".onnx"
         m.lang = m.model_dir.split("-")[2][:2]
 
@@ -450,6 +464,26 @@ def get_vits_models() -> List[TtsModel]:
     return all_models
 
 
+def get_inflect_models() -> List[TtsModel]:
+    english_models = [
+        TtsModel(
+            model_dir="vits-inflect-en-nano-v2",
+            model_name="model.onnx",
+            lang="en",
+        ),
+        TtsModel(
+            model_dir="vits-inflect-en-micro-v2",
+            model_name="model.onnx",
+            lang="en",
+        ),
+    ]
+
+    for m in english_models:
+        m.phonemize = True
+
+    return english_models
+
+
 def get_matcha_models() -> List[TtsModel]:
     chinese_models = [
         TtsModel(
@@ -478,7 +512,6 @@ def get_matcha_models() -> List[TtsModel]:
         s = [f"{m.model_dir}/{r}" for r in rule_fsts_zh]
         m.rule_fsts = ",".join(s)
         m.vocoder = "vocos-16khz-univ.onnx"
-        m.data_dir = f"{m.model_dir}/espeak-ng-data"
 
     english_persian_models = [
         TtsModel(
@@ -498,7 +531,7 @@ def get_matcha_models() -> List[TtsModel]:
         ),
     ]
     for m in english_persian_models:
-        m.data_dir = f"{m.model_dir}/espeak-ng-data"
+        m.phonemize = True
         m.vocoder = "vocos-22khz-univ.onnx"
 
     return chinese_models + english_persian_models + chinese_english_models
@@ -513,7 +546,7 @@ def get_kokoro_models() -> List[TtsModel]:
         )
     ]
     for m in english_models:
-        m.data_dir = f"{m.model_dir}/espeak-ng-data"
+        m.phonemize = True
         m.voices = "voices.bin"
 
     multi_lingual_models = [
@@ -536,17 +569,29 @@ def get_kokoro_models() -> List[TtsModel]:
             lang2="zh",
         ),
     ]
+
+    arabic_models = [
+        TtsModel(
+            model_dir="nabra-82m-arabic-int8",
+            model_name="model.int8.onnx",
+            lang="ar",
+            lang2="ar",
+        ),
+    ]
     for m in multi_lingual_models:
-        m.data_dir = f"{m.model_dir}/espeak-ng-data"
         m.voices = "voices.bin"
         m.lexicon = f"{m.model_dir}/lexicon-us-en.txt,{m.model_dir}/lexicon-zh.txt"
         m.rule_fsts = f"{m.model_dir}/phone-zh.fst,{m.model_dir}/date-zh.fst,{m.model_dir}/number-zh.fst"
 
-    return english_models + multi_lingual_models
+    for m in arabic_models:
+        m.phonemize = True
+        m.voices = "voices.bin"
+
+    return english_models + multi_lingual_models + arabic_models
 
 
 def get_kitten_models() -> List[TtsModel]:
-    english_models = [
+    kitten_models = [
         TtsModel(
             model_dir="kitten-nano-en-v0_1-fp16",
             model_name="model.fp16.onnx",
@@ -562,21 +607,63 @@ def get_kitten_models() -> List[TtsModel]:
             model_name="model.fp16.onnx",
             lang="en",
         ),
+        TtsModel(
+            model_dir="kitten-nano-en-v0_8-fp32",
+            model_name="model.fp32.onnx",
+            lang="en",
+        ),
+        TtsModel(
+            model_dir="kitten-nano-en-v0_8-int8",
+            model_name="model.int8.onnx",
+            lang="en",
+        ),
+        TtsModel(
+            model_dir="kitten-micro-en-v0_8",
+            model_name="model.onnx",
+            lang="en",
+        ),
+        TtsModel(
+            model_dir="kitten-mini-en-v0_8",
+            model_name="model.onnx",
+            lang="en",
+        ),
     ]
-    for m in english_models:
-        m.data_dir = f"{m.model_dir}/espeak-ng-data"
+    for m in kitten_models:
+        m.phonemize = True
         m.voices = "voices.bin"
         m.is_kitten = True
 
-    return english_models
+    return kitten_models
+
+
+def get_supertonic3_models() -> List[TtsModel]:
+    # fmt: off
+    langs = [
+        "en", "ko", "ja", "ar", "bg", "cs", "da", "de", "el", "es", "et",
+        "fi", "fr", "hi", "hr", "hu", "id", "it", "lt", "lv", "nl", "pl",
+        "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi"
+    ]
+    # fmt: on
+
+    supertonic_models = [
+        TtsModel(model_dir="sherpa-onnx-supertonic-3-tts-int8-2026-05-11", lang=lang)
+        for lang in langs
+    ]
+    for m in supertonic_models:
+        m.supertonic_duration_predictor = "duration_predictor.int8.onnx"
+        m.supertonic_text_encoder = "text_encoder.int8.onnx"
+        m.supertonic_vector_estimator = "vector_estimator.int8.onnx"
+        m.supertonic_vocoder = "vocoder.int8.onnx"
+        m.supertonic_tts_json = "tts.json"
+        m.supertonic_unicode_indexer = "unicode_indexer.bin"
+        m.supertonic_voice_style = "voice.bin"
+        m.is_supertonic = True
+
+    return supertonic_models
 
 
 def main():
     args = get_args()
-    index = args.index
-    total = args.total
-    assert 0 <= index < total, (index, total)
-    d = dict()
 
     all_model_list = get_vits_models()
     all_model_list += get_piper_models()
@@ -585,6 +672,17 @@ def main():
     all_model_list += get_matcha_models()
     all_model_list += get_kokoro_models()
     all_model_list += get_kitten_models()
+    all_model_list += get_supertonic3_models()
+    all_model_list += get_inflect_models()
+
+    if args.count:
+        print(len(all_model_list))
+        return
+
+    index = args.index
+    total = args.total
+    assert 0 <= index < total, (index, total)
+    d = dict()
 
     convert_lang_to_iso_639_3(all_model_list)
     print(all_model_list)
